@@ -5,16 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>@LaClaraTV - Señal Oficial</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>%F0%9F%93%BA</text></svg>">
-    <!-- Aquí llamamos al CSS separado -->
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div id="escenario">
         <div id="contenedor-tv">
             <div id="marco-tv">
+                <!-- ✅ AÑADIDO: Elemento que faltaba -->
+                <div id="estatica"></div>
+                
                 <div id="en-vivo"><div class="punto-rojo"></div> EN VIVO</div>
                 
-                <!-- AQUÍ VA TU LOGO PNG -->
                 <img id="logo-estacion" src="logo.png" alt="LaClaraTV">
                 
                 <div id="contador-viewers">👁 <span id="viewer-count">14</span> en línea</div>
@@ -30,22 +31,19 @@
                 <div id="estado-cargando"></div>
 
                 <div id="sintonia">
-				<div id="overlay-carga">
-                <div class="texto-carga">SINTONIZANDO SEÑAL...</div>
-                <div class="barra-contenedor">
-                    <div class="barra-progreso"></div>
-                </div>
-            </div>
+                    <!-- ✅ ELIMINADO: overlay duplicado que estaba aquí -->
                     <h1>SEÑAL EN ESPERA</h1>
                     <p>PRESIONA EL CONTROL</p>
                 </div>
-                            <!-- Overlay de Carga -->
-            <div id="overlay-carga">
-                <div class="texto-carga">SINTONIZANDO SEÑAL...</div>
-                <div class="barra-contenedor">
-                    <div class="barra-progreso"></div>
+
+                <!-- ✅ UN SOLO OVERLAY (el que estaba bien ubicado) -->
+                <div id="overlay-carga">
+                    <div class="texto-carga">SINTONIZANDO SEÑAL...</div>
+                    <div class="barra-contenedor">
+                        <div class="barra-progreso"></div>
+                    </div>
                 </div>
-            </div>
+
                 <div class="pantalla" id="pantalla-video">
                     <video id="video-layer-1" class="video-layer" playsinline></video>
                     <video id="video-layer-2" class="video-layer inactiva" playsinline></video>
@@ -82,7 +80,6 @@
         </div>
     </div>
 
-    <!-- Aquí llamamos al JS separado -->
     <script src="script.js" defer></script>
 </body>
 </html>

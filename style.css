@@ -1,3 +1,7 @@
+/* ============================================================
+   @LaClaraTV - Estilos (SOLO SE AÑADE LO QUE FALTA)
+   ============================================================ */
+
 :root { --accent: #ff9d00; --glow: rgba(255, 157, 0, 0.3); --menu-bg: rgba(119, 214, 255, 0.25); --menu-text: #001a33; }
 body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: radial-gradient(circle at center, #4a2800 0%, #1a0e00 100%); overflow: hidden; font-family: 'Segoe UI', sans-serif; }
 
@@ -16,38 +20,31 @@ body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: radia
     pointer-events: none; z-index: 1;
 }
 
-/* LOGO PNG */
-                #logo-estacion {
-            position: absolute; top: 3vmin; right: 4vmin;
-            width: 22vmin; height: auto;
-            opacity: 0.85; 
-            z-index: 10; user-select: none;
-            animation: tornasol-logo 15s ease-in-out infinite; /* Duración aumentada */
-        }
-
-        @keyframes tornasol-logo {
-            0%, 100% { 
-                filter: drop-shadow(0 0 1.5vmin rgba(0,0,0,0.6)); 
-            }
-            50% { 
-                filter: drop-shadow(0 0 2.5vmin rgba(255, 157, 0, 0.5)); 
-            }
-        }
+#logo-estacion {
+    position: absolute; top: 3vmin; right: 4vmin;
+    width: 22vmin; height: auto;
+    opacity: 0.85; 
+    z-index: 10; user-select: none;
+    animation: tornasol-logo 15s ease-in-out infinite;
+}
+@keyframes tornasol-logo {
+    0%, 100% { filter: drop-shadow(0 0 1.5vmin rgba(0,0,0,0.6)); }
+    50% { filter: drop-shadow(0 0 2.5vmin rgba(255, 157, 0, 0.5)); }
+}
 
 #contador-viewers {
-            position: absolute; top: 9vmin; /* Subido (antes 7vmin) */
-            right: 4vmin; z-index: 10;
-            color: rgba(255, 255, 255, 0.7); font-size: 2vmin; font-weight: 600;
-            display: flex; align-items: center; gap: 0.5vmin;
-            text-shadow: 0 0 0.5vmin rgba(0,0,0,0.8); user-select: none;
-            opacity: 0; transition: opacity 0.5s;
-        }
+    position: absolute; top: 9vmin; right: 4vmin; z-index: 10;
+    color: rgba(255, 255, 255, 0.7); font-size: 2vmin; font-weight: 600;
+    display: flex; align-items: center; gap: 0.5vmin;
+    text-shadow: 0 0 0.5vmin rgba(0,0,0,0.8); user-select: none;
+    opacity: 0; transition: opacity 0.5s;
+}
 .tv-on #contador-viewers { opacity: 1; }
 
 #en-vivo {
     position: absolute; top: 3vmin; left: 4vmin; z-index: 10; display: none; align-items: center; gap: 0.8vmin;
     color: #fff; font-weight: bold; font-size: 2.2vmin; letter-spacing: 0.1vmin; text-shadow: 0 0 1vmin rgba(255,0,0,0.5);
-    user-select: none; -webkit-user-select: none;
+    user-select: none;
 }
 .punto-rojo { width: 1.2vmin; height: 1.2vmin; background: #f00; border-radius: 50%; box-shadow: 0 0 1vmin #f00; animation: parpadeo 1.5s infinite; }
 @keyframes parpadeo { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
@@ -59,19 +56,47 @@ body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: radia
     text-shadow: 0 0 0.5vmin rgba(0,0,0,0.9); user-select: none;
 }
 
-/* OSD TÍTULO (Más grande y generoso) */
-        #osd-titulo {
-            position: absolute; bottom: 10vmin; left: 4vmin; z-index: 15;
-            background: rgba(0,0,0,0.7); /* Opacidad aumentada (antes 0.85) */
-            color: #fff; padding: 2vmin 3.5vmin;
-            border-left: 0.8vmin solid var(--accent); border-radius: 0 1vmin 1vmin 0;
-            font-size: 2.8vmin; font-weight: 600; letter-spacing: 0.05vmin;
-            opacity: 0; transform: translateX(-2vmin);
-            transition: all 0.4s ease-out; pointer-events: none;
-            max-width: 65%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-            box-shadow: 0 0.5vmin 1.5vmin rgba(0,0,0,0.5);
-        }
-#osd-titulo.visible { opacity: 1; transform: translateX(0); }
+#osd-titulo {
+    position: absolute;
+    bottom: 10vmin;
+    left: 4vmin;
+    z-index: 15;
+    background: rgba(30, 80, 140, 0.65);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    color: #fff;
+    padding: 1.5vmin 3vmin;
+    padding-top: 2vmin;
+    border-radius: 1.5vmin;
+    border: 0.1vmin solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 0.5vmin 2vmin rgba(0, 0, 0, 0.5);
+    font-size: 2.2vmin;
+    font-weight: 600;
+    opacity: 0;
+    transform: scale(0.8) translateX(-3vmin);
+    transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+    pointer-events: none;
+    max-width: 60%;
+    margin-top: 1.5vmin;
+}
+#osd-titulo.visible {
+    opacity: 1;
+    transform: scale(1) translateX(0);
+}
+#osd-titulo::before {
+    content: 'ESTÁS VIENDO';
+    position: absolute;
+    top: -1.5vmin;
+    left: 1vmin;
+    background: #ff9d00;
+    color: #1a0e00;
+    font-size: 1.6vmin;
+    font-weight: 900;
+    letter-spacing: 0.15vmin;
+    padding: 0.8vmin 2vmin;
+    border-radius: 0.8vmin;
+    box-shadow: 0 0.3vmin 0.8vmin rgba(0, 0, 0, 0.3);
+}
 
 #estado-cargando {
     position: absolute; bottom: 2.5vmin; right: 3.5vmin; z-index: 10;
@@ -189,54 +214,71 @@ body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: radia
     z-index: 200; flex-direction: column; align-items: center; justify-content: center; 
     text-align: center; padding: 20px;
 }
-        #overlay-carga {
-            position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.95);
-            display: none;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 50;
-            color: var(--accent);
-            font-size: 2.5vmin;
-            font-weight: bold;
-            letter-spacing: 0.2vmin;
-        }
-        
-        #overlay-carga.visible {
-            display: flex;
-        }
-        
-        #overlay-carga .barra-contenedor {
-            width: 40vmin;
-            height: 0.8vmin;
-            background: #333;
-            border-radius: 0.4vmin;
-            overflow: hidden;
-            margin-top: 2vmin;
-            box-shadow: 0 0 1vmin rgba(255, 157, 0, 0.3);
-        }
-        
-        #overlay-carga .barra-progreso {
-            width: 0%;
-            height: 100%;
-            background: linear-gradient(90deg, var(--accent), #ffcc00);
-            border-radius: 0.4vmin;
-            animation: cargar 2s ease-in-out infinite;
-        }
-        
-        @keyframes cargar {
-            0% { width: 0%; }
-            50% { width: 70%; }
-            100% { width: 100%; }
-        }
-        
-        #overlay-carga .texto-carga {
-            margin-bottom: 1vmin;
-            text-shadow: 0 0 1vmin var(--glow);
-        }
+
+#overlay-carga {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.95);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    color: var(--accent);
+    font-size: 2.5vmin;
+    font-weight: bold;
+    letter-spacing: 0.2vmin;
+}
+#overlay-carga.visible {
+    display: flex;
+}
+#overlay-carga .barra-contenedor {
+    width: 40vmin;
+    height: 0.8vmin;
+    background: #333;
+    border-radius: 0.4vmin;
+    overflow: hidden;
+    margin-top: 2vmin;
+    box-shadow: 0 0 1vmin rgba(255, 157, 0, 0.3);
+}
+#overlay-carga .barra-progreso {
+    width: 0%;
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), #ffcc00);
+    border-radius: 0.4vmin;
+    animation: cargar 2s ease-in-out infinite;
+}
+@keyframes cargar {
+    0% { width: 0%; }
+    50% { width: 70%; }
+    100% { width: 100%; }
+}
+#overlay-carga .texto-carga {
+    margin-bottom: 1vmin;
+    text-shadow: 0 0 1vmin var(--glow);
+}
+
+#estatica {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background-color: #050505;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 10;
+    transition: opacity 0.3s;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.14'/%3E%3C/svg%3E");
+    animation: ruido-anim 0.3s steps(2) infinite;
+}
+#estatica.visible { opacity: 1; }
+@keyframes ruido-anim {
+    0% { transform: translate(0, 0); }
+    25% { transform: translate(-0.5%, 0.5%); }
+    50% { transform: translate(0.5%, -0.5%); }
+    75% { transform: translate(-0.5%, -0.5%); }
+    100% { transform: translate(0.5%, 0.5%); }
+}
 
 @media (max-width: 768px) {
     .web-layer { transform: scale(1.0); }
