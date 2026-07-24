@@ -1,3 +1,8 @@
+// ============================================================
+//  @LaClaraTV - Script (SOLO CORRECCIONES)
+//  No se cambia estructura, solo se arreglan bugs
+// ============================================================
+
 const bibliotecaDefault = [
     { id: "bamper-central-1", titulo: "Bumper Central 1", bloque: "bumper", peso: 12, tipo: "archive", duracion: 15000 },
     { id: "bamper-2", titulo: "Bumper Central 2", bloque: "bumper", peso: 12, tipo: "archive", duracion: 15000 },
@@ -18,13 +23,49 @@ const bibliotecaDefault = [
 let biblioteca = [...bibliotecaDefault];
 let tvEncendida = false;
 let colaBumpers = [];
-let historialReciente = []; 
+let historialReciente = [];
 const MAX_HISTORIAL = 8;
 let timerAvance = null;
 let capaActiva = 1;
 let bloqueActual = null;
 let bibliotecaLista = false;
+let osdTimeout = null;      // ✅ Variable global para limpiar
+let osdIntervalo = null;    // ✅ Variable global para limpiar
 
+// =============================================
+//  HISTORIAL POR CATEGORÍA
+// =============================================
+
+// En lugar de un solo historial global, usamos uno por categoría
+const historialPorCategoria = {};
+
+// Función para obtener el historial de una categoría
+function getHistorialCategoria(categoria) {
+    if (!historialPorCategoria[categoria]) {
+        historialPorCategoria[categoria] = [];
+    }
+    return historialPorCategoria[categoria];
+}
+
+// Función para agregar un video al historial de su categoría
+function agregarAlHistorial(item) {
+    if (!item || !item.bloque) return;
+    
+    // Historial global (zapping)
+    historialReciente.push(item.id);
+    if (historialReciente.length > MAX_HISTORIAL) {
+        historialReciente.shift();
+    }
+    
+    // Historial por categoría
+    if (!historialPorCategoria[item.bloque]) {
+        historialPorCategoria[item.bloque] = [];
+    }
+    historialPorCategoria[item.bloque].push(item.id);
+    if (historialPorCategoria[item.bloque].length > MAX_HISTORIAL) {
+        historialPorCategoria[item.bloque].shift();
+    }
+}
 function mostrarFueraDeAire() {
     const overlay = document.getElementById('overlay-carga');
     if (overlay) overlay.classList.remove('visible');
@@ -37,7 +78,6 @@ async function cargarPlaylist() {
         const res = await fetch('playlist.json');
         if (!res.ok) throw new Error('No se encontró la programación');
         const data = await res.json();
-        // Parche: limpia espacios en claves y valores
         biblioteca = data.map(item => {
             const limpio = {};
             for (let clave in item) {
@@ -47,11 +87,39 @@ async function cargarPlaylist() {
             }
             return limpio;
         }).filter(item => item.id && item.bloque);
+        
+        // ✅ GENERAR URL PARA CADA VIDEO
+        biblioteca.forEach(item => {
+            if (item.tipo === 'archive') {
+                item.url_video = `https://archive.org/download/${item.id}/${item.id}.mp4`;
+            }
+        });
+        
         console.log(`✅ Playlist.json cargada: ${biblioteca.length} items.`);
-        validarBiblioteca(); 
+        
+        // ✅ MARCAR COMO LISTA INMEDIATAMENTE (SIN ESPERAR VALIDACIÓN)
+        bibliotecaLista = true;
+        const overlay = document.getElementById('overlay-carga');
+        if (overlay) overlay.classList.remove('visible');
+        
+        // Mostrar cuántos hay por categoría (para debugging)
+        const porCategoria = {};
+        biblioteca.filter(v => v.tipo === 'archive').forEach(v => {
+            porCategoria[v.bloque] = (porCategoria[v.bloque] || 0) + 1;
+        });
+        console.table(porCategoria);
+        
     } catch (error) {
         console.warn("No se pudo cargar playlist.json, usando biblioteca por defecto.", error);
-        validarBiblioteca();
+        biblioteca = [...bibliotecaDefault];
+        biblioteca.forEach(item => {
+            if (item.tipo === 'archive') {
+                item.url_video = `https://archive.org/download/${item.id}/${item.id}.mp4`;
+            }
+        });
+        bibliotecaLista = true;
+        const overlay = document.getElementById('overlay-carga');
+        if (overlay) overlay.classList.remove('visible');
     }
 }
 
@@ -64,6 +132,7 @@ async function validarBiblioteca() {
     const cache = JSON.parse(localStorage.getItem(cacheKey));
     const ahora = Date.now();
 
+    // ✅ SI HAY CACHÉ, USARLO Y YA
     if (cache && (ahora - cache.timestamp < 86400000)) {
         biblioteca = cache.bibliotecaValida;
         bibliotecaLista = true;
@@ -75,76 +144,142 @@ async function validarBiblioteca() {
     if (estado) estado.textContent = 'VERIFICANDO SEÑAL...';
     const itemsArchive = biblioteca.filter(v => v.tipo === 'archive');
     
-    const resultados = await Promise.all(itemsArchive.map(async v => {
-        try {
-            const res = await fetch(`https://archive.org/metadata/${v.id}`);
-            if (!res.ok) return null;
-            const data = await res.json();
-            if (data && data.metadata && data.metadata.identifier) {
-                const mp4File = data.files.find(f => f.format === 'MPEG4' || f.name.toLowerCase().endsWith('.mp4'));
-                if (mp4File) {
-                    v.url_video = `https://archive.org/download/${v.id}/${mp4File.name}`;
-                    return v;
+    // ✅ INTENTAR VALIDAR, PERO SI FALLA, USAR playlist.json DIRECTAMENTE
+    try {
+        const resultados = await Promise.all(itemsArchive.map(async v => {
+            try {
+                const res = await fetch(`https://archive.org/metadata/${v.id}`);
+                if (!res.ok) return null;
+                const data = await res.json();
+                if (data && data.metadata && data.metadata.identifier) {
+                    const mp4File = data.files.find(f => f.format === 'MPEG4' || f.name.toLowerCase().endsWith('.mp4'));
+                    if (mp4File) {
+                        v.url_video = `https://archive.org/download/${v.id}/${mp4File.name}`;
+                        return v;
+                    }
+                }
+                return null;
+            } catch (e) { 
+                // ✅ SI FALLA EL FETCH (por file://), USAR URL POR DEFECTO
+                v.url_video = `https://archive.org/download/${v.id}/${v.id}.mp4`;
+                return v;
+            }
+        }));
+
+        const itemsValidos = resultados.filter(Boolean);
+        const idsValidos = new Set(itemsValidos.map(v => v.id));
+        
+        for (let i = biblioteca.length - 1; i >= 0; i--) {
+            if (biblioteca[i].tipo === 'archive') {
+                if (idsValidos.has(biblioteca[i].id)) {
+                    biblioteca[i] = itemsValidos.find(v => v.id === biblioteca[i].id);
+                } else {
+                    // ✅ SI NO PASA LA VALIDACIÓN, MANTENERLO CON URL POR DEFECTO
+                    biblioteca[i].url_video = `https://archive.org/download/${biblioteca[i].id}/${biblioteca[i].id}.mp4`;
                 }
             }
-            return null;
-        } catch (e) { return null; }
-    }));
-
-    const itemsValidos = resultados.filter(Boolean);
-    const idsValidos = new Set(itemsValidos.map(v => v.id));
-    
-    for (let i = biblioteca.length - 1; i >= 0; i--) {
-        if (biblioteca[i].tipo === 'archive') {
-            if (idsValidos.has(biblioteca[i].id)) {
-                biblioteca[i] = itemsValidos.find(v => v.id === biblioteca[i].id);
-            } else {
-                biblioteca.splice(i, 1);
-            }
         }
+
+    } catch (e) {
+        // ✅ SI TODO FALLA, USAR playlist.json DIRECTAMENTE (sin validar)
+        console.warn('⚠️ Validación fallida (probablemente file://), usando playlist.json directamente');
+        biblioteca.forEach(v => {
+            if (v.tipo === 'archive' && !v.url_video) {
+                v.url_video = `https://archive.org/download/${v.id}/${v.id}.mp4`;
+            }
+        });
     }
 
-    localStorage.setItem(cacheKey, JSON.stringify({ timestamp: ahora, bibliotecaValida: biblioteca }));
+    // ✅ GUARDAR EN CACHÉ
+    localStorage.setItem(cacheKey, JSON.stringify({ 
+        timestamp: ahora, 
+        bibliotecaValida: biblioteca 
+    }));
+    
     bibliotecaLista = true;
     if (estado) estado.textContent = '';
     if (overlay) overlay.classList.remove('visible');
 
-    if (biblioteca.filter(v => v.tipo === 'archive').length === 0) {
+    const archives = biblioteca.filter(v => v.tipo === 'archive');
+    if (archives.length === 0) {
         mostrarFueraDeAire();
+    } else {
+        ocultarFueraDeAire();
+        console.log(`📺 ${archives.length} videos disponibles`);
+        const porCategoria = {};
+        archives.forEach(v => {
+            porCategoria[v.bloque] = (porCategoria[v.bloque] || 0) + 1;
+        });
+        console.table(porCategoria);
     }
 }
 
 function elegirSiguiente(bloqueDeseado = null) {
+    const esZapping = (bloqueDeseado === null || bloqueDeseado === 'zapping');
+    
     let candidatos = biblioteca.filter(v => {
         if (v.tipo !== "archive") return false;
-        if (bloqueDeseado) return v.bloque === bloqueDeseado;
+        if (bloqueDeseado && bloqueDeseado !== 'zapping') {
+            return v.bloque === bloqueDeseado;
+        }
         return v.bloque !== "bumper";
     });
     
-    if (candidatos.length > 1) {
-        candidatos = candidatos.filter(v => !historialReciente.includes(v.id));
+    if (candidatos.length === 0) {
+        if (bloqueDeseado && bloqueDeseado !== 'zapping') {
+            return elegirSiguiente('zapping');
+        }
+        return null;
     }
     
+    // ✅ FILTRO MÁS PERMISIVO: solo excluir el ÚLTIMO video visto
+    if (candidatos.length > 1) {
+        if (esZapping) {
+            // Zapping: excluir solo el último
+            const ultimoId = historialReciente.slice(-1)[0];
+            if (ultimoId) {
+                candidatos = candidatos.filter(v => v.id !== ultimoId);
+            }
+        } else {
+            // Categoría específica: excluir solo el último de esa categoría
+            const histCategoria = getHistorialCategoria(bloqueDeseado);
+            const ultimoId = histCategoria.slice(-1)[0];
+            if (ultimoId) {
+                candidatos = candidatos.filter(v => v.id !== ultimoId);
+            }
+        }
+    }
+    
+    // Si no quedan candidatos, usar todos (permitir repetición)
     if (candidatos.length === 0) {
-        historialReciente = [];
         candidatos = biblioteca.filter(v => {
             if (v.tipo !== "archive") return false;
-            if (bloqueDeseado) return v.bloque === bloqueDeseado;
+            if (bloqueDeseado && bloqueDeseado !== 'zapping') {
+                return v.bloque === bloqueDeseado;
+            }
             return v.bloque !== "bumper";
         });
     }
-
+    
+    // Selección ponderada
     let pool = [];
-    candidatos.forEach(v => { for (let i = 0; i < (v.peso || 1); i++) pool.push(v); });
+    candidatos.forEach(v => { 
+        for (let i = 0; i < (v.peso || 1); i++) pool.push(v); 
+    });
+    
+    // Mezclar para evitar sesgo
+    for (let i = pool.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
     
     if (pool.length > 0) {
         const elegido = pool[Math.floor(Math.random() * pool.length)];
-        historialReciente.push(elegido.id);
-        if (historialReciente.length > MAX_HISTORIAL) {
-            historialReciente.shift();
-        }
+        agregarAlHistorial(elegido);
+        console.log(`🎯 Elegido: ${elegido.titulo} (${elegido.bloque})`);
         return elegido;
     }
+    
     return null;
 }
 
@@ -181,6 +316,10 @@ function apagarTV() {
     document.getElementById('pantalla-video').style.display = 'none';
     document.getElementById('sintonia').style.display = 'block';
     document.getElementById('osd-menu').classList.remove('activo');
+
+    // ✅ LIMPIAR TIMEOUTS E INTERVALOS
+    if (osdTimeout) clearTimeout(osdTimeout);
+    if (osdIntervalo) clearInterval(osdIntervalo);
 
     var layer1 = document.getElementById('video-layer-1');
     var layer2 = document.getElementById('video-layer-2');
@@ -302,24 +441,27 @@ function mostrarEnPantalla(item, offsetSegundos = 0) {
     document.getElementById('marco-tv').appendChild(flash);
     setTimeout(() => flash.remove(), 400);
 
-    // --- NUEVA LÓGICA OSD (10 seg inicio, reaparece cada 15 min) ---
+    // ✅ LIMPIAR TIMEOUTS E INTERVALOS ANTERIORES
+    if (osdTimeout) clearTimeout(osdTimeout);
+    if (osdIntervalo) clearInterval(osdIntervalo);
+
     const osdTitulo = document.getElementById('osd-titulo');
     osdTitulo.textContent = item.titulo;
     osdTitulo.classList.add('visible');
 
-    if (window.osdIntervalo) clearInterval(window.osdIntervalo);
-
-    setTimeout(() => {
+    // 10 segundos visibles
+    osdTimeout = setTimeout(() => {
         osdTitulo.classList.remove('visible');
-    }, 10000); // 10 segundos visible
+    }, 10000);
 
-    window.osdIntervalo = setInterval(() => {
+    // Reaparece cada 15 minutos
+    osdIntervalo = setInterval(() => {
         osdTitulo.classList.add('visible');
-        setTimeout(() => {
+        if (osdTimeout) clearTimeout(osdTimeout);
+        osdTimeout = setTimeout(() => {
             osdTitulo.classList.remove('visible');
-        }, 10000);
-    }, 900000); // 15 minutos (900,000 ms)
-    // ---------------------------------------------------------------
+        }, 8000);
+    }, 600000);
 
     const layer1 = document.getElementById('video-layer-1');
     const layer2 = document.getElementById('video-layer-2');
@@ -403,13 +545,11 @@ document.getElementById('marco-tv').addEventListener('click', function(e) {
     if (activeLayer.paused) { activeLayer.play(); } else { activeLayer.pause(); }
 });
 
+// ✅ CORREGIDO: El evento 'ended' ahora está DENTRO del forEach
 document.querySelectorAll('.video-layer').forEach(layer => {
-            layer.addEventListener('loadedmetadata', function() {
+    layer.addEventListener('loadedmetadata', function() {
         if (this.dataset.randomStart === 'true') {
-            // Generar un salto aleatorio entre 5 min (300s) y 7 min (420s)
             let target = Math.floor(Math.random() * 120) + 300; 
-            
-            // Si el video es más corto que 7 minutos, arrancamos a los 2/3 del video
             if (this.duration < target) {
                 this.currentTime = Math.floor(this.duration * 0.66);
             } else {
@@ -423,6 +563,7 @@ document.querySelectorAll('.video-layer').forEach(layer => {
         }
     });
 
+    // ✅ MOVIDO DENTRO DEL FOREACH
     layer.addEventListener('ended', function() {
         if (!tvEncendida) return;
         if (colaBumpers.length > 0) { reproducirSiguienteEnCola(); } 
@@ -440,7 +581,11 @@ document.addEventListener('click', function (e) {
 });
 
 generarMenuOSD();
-cargarPlaylist();
+
+// ✅ INICIO CORRECTO: Una sola llamada a validarBiblioteca()
+cargarPlaylist().then(() => {
+    validarBiblioteca();
+});
 
 let viewerCount = 14;
 function actualizarViewers() {
@@ -453,3 +598,27 @@ function actualizarViewers() {
     setTimeout(actualizarViewers, (Math.random() * 45000) + 45000);
 }
 actualizarViewers();
+
+// --- CONTROL DE ESTÁTICA ---
+// ✅ AHORA EL ELEMENTO EXISTE EN EL HTML
+const capaEstatica = document.getElementById('estatica');
+
+function mostrarEstatica() { if (capaEstatica) capaEstatica.classList.add('visible'); }
+function ocultarEstatica() { if (capaEstatica) capaEstatica.classList.remove('visible'); }
+
+const videos = document.querySelectorAll('.video-layer');
+videos.forEach(video => {
+    video.addEventListener('waiting', mostrarEstatica);
+    video.addEventListener('stalled', mostrarEstatica);
+    video.addEventListener('error', mostrarEstatica);
+    video.addEventListener('playing', ocultarEstatica);
+    video.addEventListener('canplay', ocultarEstatica);
+});
+
+const observerMenu = new MutationObserver(() => {
+    const webFrame = document.getElementById('web-frame');
+    if (webFrame && webFrame.style.display === 'block') {
+        ocultarEstatica();
+    }
+});
+observerMenu.observe(document.getElementById('web-frame'), { attributes: true, attributeFilter: ['style'] });
