@@ -28,6 +28,8 @@ const MAX_HISTORIAL = 8;
 let timerAvance = null;
 let capaActiva = 1;
 let bloqueActual = null;
+let itemActual = null; // qué se está mostrando ahora mismo, para saber si terminó un bumper o un video de contenido
+let proximoContenido = null; // el próximo video de contenido ya elegido, para anunciarlo y luego reproducir exactamente ese
 let bibliotecaLista = false;
 let osdTimeout = null;      // ✅ Variable global para limpiar
 let osdIntervalo = null;    // ✅ Variable global para limpiar
@@ -71,6 +73,11 @@ function mostrarFueraDeAire() {
     if (overlay) overlay.classList.remove('visible');
     document.getElementById('pantalla-fuera-aire').style.display = 'flex';
     document.getElementById('contenedor-tv').style.display = 'none';
+}
+
+function ocultarFueraDeAire() {
+    document.getElementById('pantalla-fuera-aire').style.display = 'none';
+    document.getElementById('contenedor-tv').style.display = 'block';
 }
 
 async function cargarPlaylist() {
@@ -168,16 +175,22 @@ async function validarBiblioteca() {
 
         const itemsValidos = resultados.filter(Boolean);
         const idsValidos = new Set(itemsValidos.map(v => v.id));
-        
+        const idsDescartados = itemsArchive.filter(v => !idsValidos.has(v.id)).map(v => v.id);
+
         for (let i = biblioteca.length - 1; i >= 0; i--) {
             if (biblioteca[i].tipo === 'archive') {
                 if (idsValidos.has(biblioteca[i].id)) {
                     biblioteca[i] = itemsValidos.find(v => v.id === biblioteca[i].id);
                 } else {
-                    // ✅ SI NO PASA LA VALIDACIÓN, MANTENERLO CON URL POR DEFECTO
-                    biblioteca[i].url_video = `https://archive.org/download/${biblioteca[i].id}/${biblioteca[i].id}.mp4`;
+                    // ✅ Si no pasó la validación (no existe, o no tiene archivo de video), se saca
+                    // de la biblioteca en vez de dejarlo con una URL adivinada que casi seguro da 404.
+                    biblioteca.splice(i, 1);
                 }
             }
+        }
+
+        if (idsDescartados.length > 0) {
+            console.warn('Enlaces descartados por no existir o no tener video en archive.org:', idsDescartados);
         }
 
     } catch (e) {
@@ -213,13 +226,26 @@ async function validarBiblioteca() {
         console.table(porCategoria);
     }
 }
+let ultimoBumperId = null;
+
 function elegirBumper() {
     // Filtra solo los videos que sean bumpers (el .trim() salva los espacios de tu JSON)
-    const bumpers = biblioteca.filter(v => v.tipo === "archive" && v.bloque.trim() === "bumper");
+    let bumpers = biblioteca.filter(v => v.tipo === "archive" && v.bloque.trim() === "bumper");
     if (bumpers.length === 0) return null;
-    
-    // Elige uno al azar
-    return bumpers[Math.floor(Math.random() * bumpers.length)];
+
+    // No repetir el mismo bumper dos veces seguidas si hay más de uno
+    if (bumpers.length > 1) {
+        const sinRepetir = bumpers.filter(v => v.id !== ultimoBumperId);
+        if (sinRepetir.length > 0) bumpers = sinRepetir;
+    }
+
+    // Selección ponderada por "peso" (útil cuando haya avisos que deban salir más seguido que otros)
+    let pool = [];
+    bumpers.forEach(b => { for (let i = 0; i < (b.peso || 1); i++) pool.push(b); });
+
+    const elegido = pool[Math.floor(Math.random() * pool.length)];
+    ultimoBumperId = elegido.id;
+    return elegido;
 }
 
 function elegirSiguiente(bloqueDeseado = null) {
@@ -444,6 +470,9 @@ function reproducirSiguienteEnCola() {
 }
 
 function mostrarEnPantalla(item, offsetSegundos = 0) {
+    itemActual = item;
+    ocultarAnuncioProximo();
+
     const flash = document.createElement('div');
     flash.className = 'flash-sintonia';
     document.getElementById('marco-tv').appendChild(flash);
@@ -470,6 +499,12 @@ function mostrarEnPantalla(item, offsetSegundos = 0) {
             osdTitulo.classList.remove('visible');
         }, 8000);
     }, 600000);
+
+    // Si lo que arranca es contenido (no un bumper), ya elegimos ahora el próximo,
+    // así el anuncio "A CONTINUACIÓN" y lo que realmente se reproduce después son lo mismo.
+    if (item.tipo === 'archive' && item.bloque !== 'bumper') {
+        prepararProximoContenido();
+    }
 
     const layer1 = document.getElementById('video-layer-1');
     const layer2 = document.getElementById('video-layer-2');
@@ -498,6 +533,7 @@ function cambiarCapaVideo(url, offset, item) {
 
     capaVieja.pause();
     capaNueva.src = url;
+    capaNueva.dataset.anuncioHecho = 'false';
     
     if (offset > 0) {
         capaNueva.dataset.targetOffset = offset;
@@ -553,16 +589,73 @@ document.getElementById('marco-tv').addEventListener('click', function(e) {
     if (activeLayer.paused) { activeLayer.play(); } else { activeLayer.pause(); }
 });
 
-// ✅ CORREGIDO: El evento 'ended' ahora está DENTRO del forEach
+// Elige (y reserva) cuál va a ser el próximo video de contenido, respetando el canal actual.
+// Se llama apenas arranca un video de contenido, para tenerlo listo cuando toque anunciarlo.
+function prepararProximoContenido() {
+    if (bloqueActual && bloqueActual !== 'zapping') {
+        proximoContenido = elegirSiguiente(bloqueActual);
+    } else {
+        proximoContenido = elegirSiguiente();
+    }
+}
+
+function mostrarAnuncioProximo() {
+    if (!proximoContenido) return;
+    const el = document.getElementById('osd-proximo');
+    if (!el) return;
+    el.textContent = proximoContenido.titulo;
+    el.classList.add('visible');
+}
+
+function ocultarAnuncioProximo() {
+    const el = document.getElementById('osd-proximo');
+    if (el) el.classList.remove('visible');
+}
+
+// Decide qué mostrar a continuación (video normal o bumper). La usan tanto
+// el final natural de un video ('ended') como la recuperación por error.
+function avanzarProgramacion() {
+    if (!tvEncendida) return;
+
+    const terminoUnBumper = itemActual && itemActual.bloque === 'bumper';
+
+    // Si lo que acaba de terminar fue un video de CONTENIDO (no un bumper),
+    // siempre metemos un bumper antes de pasar al próximo video.
+    if (!terminoUnBumper) {
+        const bumper = elegirBumper();
+        if (bumper) {
+            console.log("📺 Bumper:", bumper.titulo);
+            mostrarEnPantalla(bumper);
+            return;
+        }
+    }
+
+    // Termina acá si: el que acaba de terminar fue un bumper (toca el próximo contenido),
+    // o no hay bumpers cargados todavía.
+    if (proximoContenido) {
+        const siguiente = proximoContenido;
+        proximoContenido = null;
+        mostrarEnPantalla(siguiente);
+        return;
+    }
+
+    // Red de seguridad por si proximoContenido no se llegó a preparar
+    if (bloqueActual && bloqueActual !== 'zapping') {
+        reproducirBloqueFijo(bloqueActual);
+    } else {
+        const video = elegirSiguiente();
+        if (video) mostrarEnPantalla(video);
+    }
+}
+
+let fallosSeguidos = 0;
+const MAX_FALLOS_SEGUIDOS = 3;
+
 document.querySelectorAll('.video-layer').forEach(layer => {
     layer.addEventListener('loadedmetadata', function() {
         if (this.dataset.randomStart === 'true') {
-            let target = Math.floor(Math.random() * 120) + 300; 
-            if (this.duration < target) {
-                this.currentTime = Math.floor(this.duration * 0.66);
-            } else {
-                this.currentTime = target;
-            }
+            let target = Math.floor(Math.random() * 120) + 300; // arranca entre el minuto 5 y 7
+            this.currentTime = (this.duration && this.duration < target) ? Math.floor(this.duration * 0.66) : target;
             delete this.dataset.randomStart;
         } else if (this.dataset.targetOffset) {
             let target = parseFloat(this.dataset.targetOffset);
@@ -571,38 +664,37 @@ document.querySelectorAll('.video-layer').forEach(layer => {
         }
     });
 
-    document.querySelectorAll('.video-layer').forEach(layer => {
-    layer.addEventListener('loadedmetadata', function() {
-        if (this.dataset.randomStart === 'true') {
-            let target = Math.floor(Math.random() * 120) + 300; // 5 a 7 min
-            this.currentTime = (this.duration < target) ? Math.floor(this.duration * 0.66) : target;
-            delete this.dataset.randomStart;
+    layer.addEventListener('ended', function() {
+        fallosSeguidos = 0; // terminó bien, resetea el contador de fallos
+        avanzarProgramacion();
+    });
+
+    // Al llegar al 75% del video de contenido actual, anuncia el próximo (una sola vez por video).
+    layer.addEventListener('timeupdate', function() {
+        if (!this.classList.contains('activa')) return;
+        if (!itemActual || itemActual.bloque === 'bumper') return;
+        if (this.dataset.anuncioHecho === 'true') return;
+        if (!this.duration || !isFinite(this.duration)) return;
+        if (this.currentTime / this.duration >= 0.75) {
+            this.dataset.anuncioHecho = 'true';
+            mostrarAnuncioProximo();
         }
     });
 
-    layer.addEventListener('ended', function() {
+    // Un video roto (404, formato no soportado, etc.) ya no se queda trabado en estática:
+    // después de una pausa breve, salta al siguiente. Si varios seguidos fallan, se corta
+    // la señal en vez de reintentar en bucle infinito.
+    layer.addEventListener('error', function() {
         if (!tvEncendida) return;
-
-        // 40% de probabilidad de insertar un bumper entre videos
-        const probabilidadBumper = 0.4;
-        const usarBumper = Math.random() < probabilidadBumper;
-
-        if (usarBumper) {
-            const bumper = elegirBumper();
-            if (bumper) {
-                console.log("📺 Insertando corte comercial (bumper):", bumper.titulo);
-                mostrarEnPantalla(bumper);
-                return; // Sale de la función. Cuando el bumper termine, disparará este evento de nuevo.
-            }
+        fallosSeguidos++;
+        console.warn('⚠️ Error al cargar el video, saltando al siguiente', fallosSeguidos);
+        if (fallosSeguidos > MAX_FALLOS_SEGUIDOS) {
+            console.warn('⚠️ Demasiados fallos seguidos, cortando la señal.');
+            fallosSeguidos = 0;
+            mostrarFueraDeAire();
+            return;
         }
-
-        // Si no hay bumper, seguimos la lógica normal de programación
-        if (bloqueActual && bloqueActual !== 'zapping') {
-            reproducirBloqueFijo(bloqueActual);
-        } else {
-            const video = elegirSiguiente();
-            if (video) mostrarEnPantalla(video);
-        }
+        setTimeout(avanzarProgramacion, 2000);
     });
 });
 

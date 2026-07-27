@@ -15,13 +15,21 @@
                 <img id="logo-estacion" src="logo.png" alt="LaClaraTV">
                 <div id="contador-viewers">👁 <span id="viewer-count">14</span> en línea</div>
                 <div id="reloj-en-vivo">00:00:00</div>
-                <div id="osd-titulo"></div>
+                <div id="osd-info">
+                    <div id="osd-titulo"></div>
+                    <div id="osd-proximo"></div>
+                </div>
                 <div id="osd-volumen">
                     <span>🔊</span>
                     <div id="barra-vol-contenedor"><div id="barra-vol" style="width:100%;"></div></div>
                     <span id="txt-vol">100%</span>
                 </div>
                 <div id="estado-cargando"></div>
+
+                <div id="overlay-carga">
+                    <div class="texto-carga">CARGANDO SEÑAL...</div>
+                    <div class="barra-contenedor"><div class="barra-progreso"></div></div>
+                </div>
 
                 <div id="sintonia">
                     <h1>SEÑAL EN ESPERA</h1>
@@ -32,6 +40,7 @@
                     <video id="video-layer-1" class="video-layer" playsinline></video>
                     <video id="video-layer-2" class="video-layer inactiva" playsinline></video>
                     <iframe id="web-frame" class="web-layer" style="display: none;" allow="autoplay; fullscreen"></iframe>
+                    <div id="estatica"></div>
                 </div>
             </div>
 
