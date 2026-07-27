@@ -57,46 +57,49 @@ body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: radia
 }
 
 #osd-info {
+    max-width: 60%;
+}
+
+#osd-titulo, #osd-proximo {
     position: absolute;
-    bottom: 17vmin;
+    bottom: 10vmin;
     left: 4vmin;
     z-index: 15;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 1.5vmin;
-    max-width: 60%;
+    max-width: 55%;
+    box-sizing: border-box;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    color: #fff;
+    padding: 1.5vmin 3vmin;
+    padding-top: 2vmin;
+    border-radius: 1.5vmin;
+    border: 0.1vmin solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 0.5vmin 2vmin rgba(0, 0, 0, 0.5);
+    font-size: 2.75vmin;
+    font-weight: 600;
+    opacity: 0;
+    transform: translateX(-6vmin);
+    transition: opacity 0.5s ease-out, transform 0.5s ease-out;
     pointer-events: none;
 }
-
-#osd-titulo {
-    position: relative;
-    background: rgba(30, 80, 140, 0.65);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    color: #fff;
-    padding: 1.5vmin 3vmin;
-    padding-top: 2vmin;
-    border-radius: 1.5vmin;
-    border: 0.1vmin solid rgba(255, 255, 255, 0.2);
-    box-shadow: 0 0.5vmin 2vmin rgba(0, 0, 0, 0.5);
-    font-size: 2.75vmin;
-    font-weight: 600;
-    opacity: 0;
-    transform: scale(0.8) translateX(-3vmin);
-    transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
-    margin-top: 1.5vmin;
-}
-#osd-titulo.visible {
+#osd-titulo.visible, #osd-proximo.visible {
     opacity: 1;
-    transform: scale(1) translateX(0);
+    transform: translateX(0);
 }
-#osd-titulo::before {
-    content: 'ESTÁS VIENDO';
+#osd-titulo { background: rgba(30, 80, 140, 0.65); }
+#osd-proximo { background: rgba(140, 30, 120, 0.65); }
+
+.osd-texto {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#osd-titulo::before, #osd-proximo::before {
     position: absolute;
     top: -1.5vmin;
     left: 1vmin;
-    background: #ff9d00;
     color: #1a0e00;
     font-size: 2vmin;
     font-weight: 900;
@@ -105,44 +108,8 @@ body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: radia
     border-radius: 0.8vmin;
     box-shadow: 0 0.3vmin 0.8vmin rgba(0, 0, 0, 0.3);
 }
-
-/* "A CONTINUACIÓN": aparece al 75% del video actual, anunciando el próximo contenido */
-#osd-proximo {
-    position: relative;
-    background: rgba(140, 30, 120, 0.65);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    color: #fff;
-    padding: 1.5vmin 3vmin;
-    padding-top: 2vmin;
-    border-radius: 1.5vmin;
-    border: 0.1vmin solid rgba(255, 255, 255, 0.2);
-    box-shadow: 0 0.5vmin 2vmin rgba(0, 0, 0, 0.5);
-    font-size: 2.75vmin;
-    font-weight: 600;
-    opacity: 0;
-    transform: scale(0.8) translateX(-3vmin);
-    transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
-    margin-top: 1.5vmin;
-}
-#osd-proximo.visible {
-    opacity: 1;
-    transform: scale(1) translateX(0);
-}
-#osd-proximo::before {
-    content: 'A CONTINUACIÓN';
-    position: absolute;
-    top: -1.5vmin;
-    left: 1vmin;
-    background: #e91e9c;
-    color: #1a0e00;
-    font-size: 2vmin;
-    font-weight: 900;
-    letter-spacing: 0.15vmin;
-    padding: 0.8vmin 2vmin;
-    border-radius: 0.8vmin;
-    box-shadow: 0 0.3vmin 0.8vmin rgba(0, 0, 0, 0.3);
-}
+#osd-titulo::before { content: 'ESTÁS VIENDO'; background: #ff9d00; }
+#osd-proximo::before { content: 'A CONTINUACIÓN'; background: #e91e9c; }
 
 #estado-cargando {
     position: absolute; bottom: 2.5vmin; right: 3.5vmin; z-index: 10;

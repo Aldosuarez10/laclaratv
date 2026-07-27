@@ -32,7 +32,11 @@ let itemActual = null; // qué se está mostrando ahora mismo, para saber si ter
 let proximoContenido = null; // el próximo video de contenido ya elegido, para anunciarlo y luego reproducir exactamente ese
 let bibliotecaLista = false;
 let osdTimeout = null;      // ✅ Variable global para limpiar
-let osdIntervalo = null;    // ✅ Variable global para limpiar
+let osdIntervalo = null;    // ✅ Variable global para limpiar (pulso de presencia cada 5 min)
+let colaOSD = [];           // cola de carteles pendientes (nunca se muestran dos a la vez)
+let procesandoOSD = false;
+const OSD_DURACION_VISIBLE = 8000;   // 8 segundos visible cada vez
+const OSD_INTERVALO_PULSO = 300000;  // marca presencia cada 5 minutos
 
 // =============================================
 //  HISTORIAL POR CATEGORÍA
@@ -354,6 +358,7 @@ function apagarTV() {
     // ✅ LIMPIAR TIMEOUTS E INTERVALOS
     if (osdTimeout) clearTimeout(osdTimeout);
     if (osdIntervalo) clearInterval(osdIntervalo);
+    limpiarColaOSD();
 
     var layer1 = document.getElementById('video-layer-1');
     var layer2 = document.getElementById('video-layer-2');
@@ -471,34 +476,25 @@ function reproducirSiguienteEnCola() {
 
 function mostrarEnPantalla(item, offsetSegundos = 0) {
     itemActual = item;
-    ocultarAnuncioProximo();
+    limpiarColaOSD();
 
     const flash = document.createElement('div');
     flash.className = 'flash-sintonia';
     document.getElementById('marco-tv').appendChild(flash);
     setTimeout(() => flash.remove(), 400);
 
-    // ✅ LIMPIAR TIMEOUTS E INTERVALOS ANTERIORES
-    if (osdTimeout) clearTimeout(osdTimeout);
+    // ✅ LIMPIAR EL PULSO DE PRESENCIA ANTERIOR
     if (osdIntervalo) clearInterval(osdIntervalo);
 
-    const osdTitulo = document.getElementById('osd-titulo');
-    osdTitulo.textContent = item.titulo;
-    osdTitulo.classList.add('visible');
-
-    // 10 segundos visibles
-    osdTimeout = setTimeout(() => {
-        osdTitulo.classList.remove('visible');
-    }, 10000);
-
-    // Reaparece cada 15 minutos
-    osdIntervalo = setInterval(() => {
-        osdTitulo.classList.add('visible');
-        if (osdTimeout) clearTimeout(osdTimeout);
-        osdTimeout = setTimeout(() => {
-            osdTitulo.classList.remove('visible');
-        }, 8000);
-    }, 600000);
+    // Marca de presencia del canal: aparece ahora, y se repite cada 5 minutos
+    // mientras dure este mismo video ("Ey, estamos aquí, estás viendo...").
+    // Los bumpers no llevan cartel — son cortos y no tiene sentido anunciarlos.
+    if (item.bloque !== 'bumper') {
+        encolarOSD('titulo', item.titulo);
+        osdIntervalo = setInterval(() => {
+            encolarOSD('titulo', item.titulo);
+        }, OSD_INTERVALO_PULSO);
+    }
 
     // Si lo que arranca es contenido (no un bumper), ya elegimos ahora el próximo,
     // así el anuncio "A CONTINUACIÓN" y lo que realmente se reproduce después son lo mismo.
@@ -538,6 +534,10 @@ function cambiarCapaVideo(url, offset, item) {
     if (offset > 0) {
         capaNueva.dataset.targetOffset = offset;
         capaNueva.dataset.randomStart = 'false';
+    } else if (item && item.bloque === 'bumper') {
+        // Los bumpers siempre arrancan desde el principio, nunca "empezados"
+        capaNueva.dataset.randomStart = 'false';
+        delete capaNueva.dataset.targetOffset;
     } else {
         capaNueva.dataset.randomStart = 'true';
     }
@@ -599,17 +599,39 @@ function prepararProximoContenido() {
     }
 }
 
-function mostrarAnuncioProximo() {
-    if (!proximoContenido) return;
-    const el = document.getElementById('osd-proximo');
-    if (!el) return;
-    el.textContent = proximoContenido.titulo;
-    el.classList.add('visible');
+// Sistema de cola para los carteles OSD (osd-titulo / osd-proximo).
+// Garantiza que nunca se vean los dos al mismo tiempo: si hay uno visible,
+// el siguiente espera su turno y aparece recién cuando el anterior termina.
+function encolarOSD(tipo, texto) {
+    colaOSD.push({ tipo, texto });
+    procesarColaOSD();
 }
 
-function ocultarAnuncioProximo() {
-    const el = document.getElementById('osd-proximo');
-    if (el) el.classList.remove('visible');
+function procesarColaOSD() {
+    if (procesandoOSD) return;
+    const siguiente = colaOSD.shift();
+    if (!siguiente) return;
+    procesandoOSD = true;
+
+    const el = document.getElementById(siguiente.tipo === 'proximo' ? 'osd-proximo' : 'osd-titulo');
+    el.querySelector('.osd-texto').textContent = siguiente.texto;
+    el.classList.add('visible');
+
+    osdTimeout = setTimeout(() => {
+        el.classList.remove('visible');
+        procesandoOSD = false;
+        setTimeout(procesarColaOSD, 400); // pequeño respiro antes de que entre el próximo, si hay uno esperando
+    }, OSD_DURACION_VISIBLE);
+}
+
+function limpiarColaOSD() {
+    colaOSD = [];
+    procesandoOSD = false;
+    if (osdTimeout) clearTimeout(osdTimeout);
+    const t = document.getElementById('osd-titulo');
+    const p = document.getElementById('osd-proximo');
+    if (t) t.classList.remove('visible');
+    if (p) p.classList.remove('visible');
 }
 
 // Decide qué mostrar a continuación (video normal o bumper). La usan tanto
@@ -669,15 +691,18 @@ document.querySelectorAll('.video-layer').forEach(layer => {
         avanzarProgramacion();
     });
 
-    // Al llegar al 75% del video de contenido actual, anuncia el próximo (una sola vez por video).
+    // Al llegar a los 2/3 del video de contenido actual, anuncia el próximo (una sola vez por video).
+    // Primero marca presencia ("estás viendo") y, apenas ese termina, entra "a continuación" —
+    // nunca los dos juntos, gracias a la cola.
     layer.addEventListener('timeupdate', function() {
         if (!this.classList.contains('activa')) return;
         if (!itemActual || itemActual.bloque === 'bumper') return;
         if (this.dataset.anuncioHecho === 'true') return;
         if (!this.duration || !isFinite(this.duration)) return;
-        if (this.currentTime / this.duration >= 0.75) {
+        if (this.currentTime / this.duration >= 0.66) {
             this.dataset.anuncioHecho = 'true';
-            mostrarAnuncioProximo();
+            encolarOSD('titulo', itemActual.titulo);
+            if (proximoContenido) encolarOSD('proximo', proximoContenido.titulo);
         }
     });
 
@@ -713,7 +738,7 @@ cargarPlaylist().then(() => {
     validarBiblioteca();
 });
 
-let viewerCount = 14;
+let viewerCount = Math.floor(Math.random() * (25 - 8 + 1)) + 8; // arranca distinto en cada visita (entre 8 y 25)
 function actualizarViewers() {
     const el = document.getElementById('viewer-count');
     if (el) {
