@@ -11,37 +11,21 @@
     <div id="escenario">
         <div id="contenedor-tv">
             <div id="marco-tv">
-                <!-- ✅ AÑADIDO: Elemento que faltaba -->
-                <div id="estatica"></div>
-                
                 <div id="en-vivo"><div class="punto-rojo"></div> EN VIVO</div>
-                
                 <img id="logo-estacion" src="logo.png" alt="LaClaraTV">
-                
                 <div id="contador-viewers">👁 <span id="viewer-count">14</span> en línea</div>
                 <div id="reloj-en-vivo">00:00:00</div>
                 <div id="osd-titulo"></div>
                 <div id="osd-volumen">
                     <span>🔊</span>
-                    <div id="barra-vol-contenedor">
-                        <div id="barra-vol" style="width:100%;"></div>
-                    </div>
+                    <div id="barra-vol-contenedor"><div id="barra-vol" style="width:100%;"></div></div>
                     <span id="txt-vol">100%</span>
                 </div>
                 <div id="estado-cargando"></div>
 
                 <div id="sintonia">
-                    <!-- ✅ ELIMINADO: overlay duplicado que estaba aquí -->
                     <h1>SEÑAL EN ESPERA</h1>
                     <p>PRESIONA EL CONTROL</p>
-                </div>
-
-                <!-- ✅ UN SOLO OVERLAY (el que estaba bien ubicado) -->
-                <div id="overlay-carga">
-                    <div class="texto-carga">SINTONIZANDO SEÑAL...</div>
-                    <div class="barra-contenedor">
-                        <div class="barra-progreso"></div>
-                    </div>
                 </div>
 
                 <div class="pantalla" id="pantalla-video">
@@ -52,10 +36,7 @@
             </div>
 
             <div id="cntrl-box">
-                <div id="osd-menu">
-                    <div id="menu-dinamico"></div>
-                </div>
-
+                <div id="osd-menu"><div id="menu-dinamico"></div></div>
                 <div id="control">
                     <div id="luz"></div>
                     <div class="btn-remoto" id="btn-power" onclick="toggleTV(event)"></div>
@@ -69,7 +50,7 @@
         </div>
 
         <div id="pantalla-fuera-aire">
-            <div style="font-size: 4rem; margin-bottom: 20px;"></div>
+            <div style="font-size: 4rem; margin-bottom: 20px;">📺</div>
             <h1 style="color: #ff9d00; font-size: 2rem; margin: 0; font-weight: 700;">@LaClaraTV</h1>
             <p style="color: #fff; font-size: 1.3rem; margin: 20px 0; font-weight: 300;">Momentáneamente fuera de aire.</p>
             <p style="color: #ccc; font-size: 1rem; margin-bottom: 10px;">Dirígete a nuestro canal en vivo:</p>
@@ -79,7 +60,6 @@
             <p style="color: #666; margin-top: 40px; font-size: 0.9rem;">¡Vuelve más tarde!</p>
         </div>
     </div>
-
     <script src="script.js" defer></script>
 </body>
 </html>
