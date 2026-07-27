@@ -213,6 +213,14 @@ async function validarBiblioteca() {
         console.table(porCategoria);
     }
 }
+function elegirBumper() {
+    // Filtra solo los videos que sean bumpers (el .trim() salva los espacios de tu JSON)
+    const bumpers = biblioteca.filter(v => v.tipo === "archive" && v.bloque.trim() === "bumper");
+    if (bumpers.length === 0) return null;
+    
+    // Elige uno al azar
+    return bumpers[Math.floor(Math.random() * bumpers.length)];
+}
 
 function elegirSiguiente(bloqueDeseado = null) {
     const esZapping = (bloqueDeseado === null || bloqueDeseado === 'zapping');
@@ -563,12 +571,38 @@ document.querySelectorAll('.video-layer').forEach(layer => {
         }
     });
 
-    // ✅ MOVIDO DENTRO DEL FOREACH
+    document.querySelectorAll('.video-layer').forEach(layer => {
+    layer.addEventListener('loadedmetadata', function() {
+        if (this.dataset.randomStart === 'true') {
+            let target = Math.floor(Math.random() * 120) + 300; // 5 a 7 min
+            this.currentTime = (this.duration < target) ? Math.floor(this.duration * 0.66) : target;
+            delete this.dataset.randomStart;
+        }
+    });
+
     layer.addEventListener('ended', function() {
         if (!tvEncendida) return;
-        if (colaBumpers.length > 0) { reproducirSiguienteEnCola(); } 
-        else if (bloqueActual && bloqueActual !== 'zapping') { reproducirBloqueFijo(bloqueActual); } 
-        else { reproducirSiguienteEnCola(); }
+
+        // 40% de probabilidad de insertar un bumper entre videos
+        const probabilidadBumper = 0.4;
+        const usarBumper = Math.random() < probabilidadBumper;
+
+        if (usarBumper) {
+            const bumper = elegirBumper();
+            if (bumper) {
+                console.log("📺 Insertando corte comercial (bumper):", bumper.titulo);
+                mostrarEnPantalla(bumper);
+                return; // Sale de la función. Cuando el bumper termine, disparará este evento de nuevo.
+            }
+        }
+
+        // Si no hay bumper, seguimos la lógica normal de programación
+        if (bloqueActual && bloqueActual !== 'zapping') {
+            reproducirBloqueFijo(bloqueActual);
+        } else {
+            const video = elegirSiguiente();
+            if (video) mostrarEnPantalla(video);
+        }
     });
 });
 
