@@ -163,8 +163,19 @@ async function validarBiblioteca() {
                 if (!res.ok) return null;
                 const data = await res.json();
                 if (data && data.metadata && data.metadata.identifier) {
-                    const mp4File = data.files.find(f => f.format === 'MPEG4' || f.name.toLowerCase().endsWith('.mp4'));
-                    if (mp4File) {
+                    const candidatos = data.files.filter(f =>
+                        f.format === 'MPEG4' || f.format === 'h.264' || f.name.toLowerCase().endsWith('.mp4')
+                    );
+                    if (candidatos.length > 0) {
+                        // Preferimos el/los derivados livianos que genera archive.org para reproducir
+                        // (source: "derivative") sobre el archivo original que subió el usuario, que
+                        // suele ser mucho más pesado/de mayor bitrate y es lo que hace que se trabe
+                        // en una descarga directa sin streaming adaptativo.
+                        const derivados = candidatos.filter(f => f.source === 'derivative');
+                        const pool = derivados.length > 0 ? derivados : candidatos;
+                        // Entre los candidatos, el de menor tamaño = menor bitrate = más estable en vivo
+                        pool.sort((a, b) => (parseInt(a.size) || Infinity) - (parseInt(b.size) || Infinity));
+                        const mp4File = pool[0];
                         v.url_video = `https://archive.org/download/${v.id}/${mp4File.name}`;
                         return v;
                     }
