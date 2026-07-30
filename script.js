@@ -676,8 +676,14 @@ const MAX_FALLOS_SEGUIDOS = 3;
 document.querySelectorAll('.video-layer').forEach(layer => {
     layer.addEventListener('loadedmetadata', function() {
         if (this.dataset.randomStart === 'true') {
-            let target = Math.floor(Math.random() * 120) + 300; // arranca entre el minuto 5 y 7
-            this.currentTime = (this.duration && this.duration < target) ? Math.floor(this.duration * 0.66) : target;
+            // Arranca en un punto proporcional a la duración real (no un tiempo fijo),
+            // para que un documental corto no pierda 5-7 minutos parejo con uno largo.
+            const PORCENTAJE_MIN = 0.04; // 4% del video
+            const PORCENTAJE_MAX = 0.09; // 9% del video
+            if (this.duration && isFinite(this.duration)) {
+                const porcentaje = PORCENTAJE_MIN + Math.random() * (PORCENTAJE_MAX - PORCENTAJE_MIN);
+                this.currentTime = this.duration * porcentaje;
+            }
             delete this.dataset.randomStart;
         } else if (this.dataset.targetOffset) {
             let target = parseFloat(this.dataset.targetOffset);
