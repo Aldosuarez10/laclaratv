@@ -3,7 +3,7 @@
   "short_name": "LaClaraTV",
   "description": "Canal de televisión online 24 horas sin cortes: misterio, historia alternativa, ciencia y espiritualidad.",
   "start_url": "https://aldosuarez10.github.io/laclaratv/",
-  "scope": "./",
+  "scope": "/laclaratv/",
   "display": "standalone",
   "orientation": "landscape",
   "background_color": "#1a0e00",
