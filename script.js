@@ -1,6 +1,6 @@
 // ============================================================
-//  @LaClaraTV - Script (SOLO CORRECCIONES)
-//  No se cambia estructura, solo se arreglan bugs
+//  @LaClaraTV - Script OPTIMIZADO (SIN VALIDACIÓN)
+//  Usa directamente playlist.json sin llamar a metadatos
 // ============================================================
 
 const bibliotecaDefault = [
@@ -28,24 +28,22 @@ const MAX_HISTORIAL = 8;
 let timerAvance = null;
 let capaActiva = 1;
 let bloqueActual = null;
-let itemActual = null; // qué se está mostrando ahora mismo, para saber si terminó un bumper o un video de contenido
-let proximoContenido = null; // el próximo video de contenido ya elegido, para anunciarlo y luego reproducir exactamente ese
+let itemActual = null;
+let proximoContenido = null;
 let bibliotecaLista = false;
-let osdTimeout = null;      // ✅ Variable global para limpiar
-let osdIntervalo = null;    // ✅ Variable global para limpiar (pulso de presencia cada 5 min)
-let colaOSD = [];           // cola de carteles pendientes (nunca se muestran dos a la vez)
+let osdTimeout = null;
+let osdIntervalo = null;
+let colaOSD = [];
 let procesandoOSD = false;
-const OSD_DURACION_VISIBLE = 8000;   // 8 segundos visible cada vez
-const OSD_INTERVALO_PULSO = 300000;  // marca presencia cada 5 minutos
+const OSD_DURACION_VISIBLE = 8000;
+const OSD_INTERVALO_PULSO = 300000;
 
 // =============================================
 //  HISTORIAL POR CATEGORÍA
 // =============================================
 
-// En lugar de un solo historial global, usamos uno por categoría
 const historialPorCategoria = {};
 
-// Función para obtener el historial de una categoría
 function getHistorialCategoria(categoria) {
     if (!historialPorCategoria[categoria]) {
         historialPorCategoria[categoria] = [];
@@ -53,17 +51,14 @@ function getHistorialCategoria(categoria) {
     return historialPorCategoria[categoria];
 }
 
-// Función para agregar un video al historial de su categoría
 function agregarAlHistorial(item) {
     if (!item || !item.bloque) return;
     
-    // Historial global (zapping)
     historialReciente.push(item.id);
     if (historialReciente.length > MAX_HISTORIAL) {
         historialReciente.shift();
     }
     
-    // Historial por categoría
     if (!historialPorCategoria[item.bloque]) {
         historialPorCategoria[item.bloque] = [];
     }
@@ -72,6 +67,11 @@ function agregarAlHistorial(item) {
         historialPorCategoria[item.bloque].shift();
     }
 }
+
+// =============================================
+//  FUNCIONES PRINCIPALES
+// =============================================
+
 function mostrarFueraDeAire() {
     const overlay = document.getElementById('overlay-carga');
     if (overlay) overlay.classList.remove('visible');
@@ -99,7 +99,7 @@ async function cargarPlaylist() {
             return limpio;
         }).filter(item => item.id && item.bloque);
         
-        // ✅ GENERAR URL PARA CADA VIDEO
+        // ✅ GENERAR URL PARA CADA VIDEO DIRECTAMENTE (SIN VALIDACIÓN)
         biblioteca.forEach(item => {
             if (item.tipo === 'archive') {
                 item.url_video = `https://archive.org/download/${item.id}/${item.id}.mp4`;
@@ -107,13 +107,13 @@ async function cargarPlaylist() {
         });
         
         console.log(`✅ Playlist.json cargada: ${biblioteca.length} items.`);
-        
-        // ✅ MARCAR COMO LISTA INMEDIATAMENTE (SIN ESPERAR VALIDACIÓN)
         bibliotecaLista = true;
+        
         const overlay = document.getElementById('overlay-carga');
         if (overlay) overlay.classList.remove('visible');
         
-        // Mostrar cuántos hay por categoría (para debugging)
+        ocultarFueraDeAire();
+        
         const porCategoria = {};
         biblioteca.filter(v => v.tipo === 'archive').forEach(v => {
             porCategoria[v.bloque] = (porCategoria[v.bloque] || 0) + 1;
@@ -129,132 +129,23 @@ async function cargarPlaylist() {
             }
         });
         bibliotecaLista = true;
+        ocultarFueraDeAire();
         const overlay = document.getElementById('overlay-carga');
         if (overlay) overlay.classList.remove('visible');
     }
 }
 
-async function validarBiblioteca() {
-    const overlay = document.getElementById('overlay-carga');
-    if (overlay) overlay.classList.add('visible');
-
-    const estado = document.getElementById('estado-cargando');
-    const cacheKey = 'laclara_tv_validacion_v5';
-    const cache = JSON.parse(localStorage.getItem(cacheKey));
-    const ahora = Date.now();
-
-    // ✅ SI HAY CACHÉ, USARLO Y YA
-    if (cache && (ahora - cache.timestamp < 86400000)) {
-        biblioteca = cache.bibliotecaValida;
-        bibliotecaLista = true;
-        console.log("✅ Señal restaurada desde caché");
-        if (overlay) overlay.classList.remove('visible');
-        return;
-    }
-
-    if (estado) estado.textContent = 'VERIFICANDO SEÑAL...';
-    const itemsArchive = biblioteca.filter(v => v.tipo === 'archive');
-    
-    // ✅ INTENTAR VALIDAR, PERO SI FALLA, USAR playlist.json DIRECTAMENTE
-    try {
-        const resultados = await Promise.all(itemsArchive.map(async v => {
-            try {
-                const res = await fetch(`https://archive.org/metadata/${v.id}`);
-                if (!res.ok) return null;
-                const data = await res.json();
-                if (data && data.metadata && data.metadata.identifier) {
-                    const candidatos = data.files.filter(f =>
-                        f.format === 'MPEG4' || f.format === 'h.264' || f.name.toLowerCase().endsWith('.mp4')
-                    );
-                    if (candidatos.length > 0) {
-                        // Preferimos el/los derivados livianos que genera archive.org para reproducir
-                        // (source: "derivative") sobre el archivo original que subió el usuario, que
-                        // suele ser mucho más pesado/de mayor bitrate y es lo que hace que se trabe
-                        // en una descarga directa sin streaming adaptativo.
-                        const derivados = candidatos.filter(f => f.source === 'derivative');
-                        const pool = derivados.length > 0 ? derivados : candidatos;
-                        // Entre los candidatos, el de menor tamaño = menor bitrate = más estable en vivo
-                        pool.sort((a, b) => (parseInt(a.size) || Infinity) - (parseInt(b.size) || Infinity));
-                        const mp4File = pool[0];
-                        v.url_video = `https://archive.org/download/${v.id}/${mp4File.name}`;
-                        return v;
-                    }
-                }
-                return null;
-            } catch (e) { 
-                // ✅ SI FALLA EL FETCH (por file://), USAR URL POR DEFECTO
-                v.url_video = `https://archive.org/download/${v.id}/${v.id}.mp4`;
-                return v;
-            }
-        }));
-
-        const itemsValidos = resultados.filter(Boolean);
-        const idsValidos = new Set(itemsValidos.map(v => v.id));
-        const idsDescartados = itemsArchive.filter(v => !idsValidos.has(v.id)).map(v => v.id);
-
-        for (let i = biblioteca.length - 1; i >= 0; i--) {
-            if (biblioteca[i].tipo === 'archive') {
-                if (idsValidos.has(biblioteca[i].id)) {
-                    biblioteca[i] = itemsValidos.find(v => v.id === biblioteca[i].id);
-                } else {
-                    // ✅ Si no pasó la validación (no existe, o no tiene archivo de video), se saca
-                    // de la biblioteca en vez de dejarlo con una URL adivinada que casi seguro da 404.
-                    biblioteca.splice(i, 1);
-                }
-            }
-        }
-
-        if (idsDescartados.length > 0) {
-            console.warn('Enlaces descartados por no existir o no tener video en archive.org:', idsDescartados);
-        }
-
-    } catch (e) {
-        // ✅ SI TODO FALLA, USAR playlist.json DIRECTAMENTE (sin validar)
-        console.warn('⚠️ Validación fallida (probablemente file://), usando playlist.json directamente');
-        biblioteca.forEach(v => {
-            if (v.tipo === 'archive' && !v.url_video) {
-                v.url_video = `https://archive.org/download/${v.id}/${v.id}.mp4`;
-            }
-        });
-    }
-
-    // ✅ GUARDAR EN CACHÉ
-    localStorage.setItem(cacheKey, JSON.stringify({ 
-        timestamp: ahora, 
-        bibliotecaValida: biblioteca 
-    }));
-    
-    bibliotecaLista = true;
-    if (estado) estado.textContent = '';
-    if (overlay) overlay.classList.remove('visible');
-
-    const archives = biblioteca.filter(v => v.tipo === 'archive');
-    if (archives.length === 0) {
-        mostrarFueraDeAire();
-    } else {
-        ocultarFueraDeAire();
-        console.log(`📺 ${archives.length} videos disponibles`);
-        const porCategoria = {};
-        archives.forEach(v => {
-            porCategoria[v.bloque] = (porCategoria[v.bloque] || 0) + 1;
-        });
-        console.table(porCategoria);
-    }
-}
 let ultimoBumperId = null;
 
 function elegirBumper() {
-    // Filtra solo los videos que sean bumpers (el .trim() salva los espacios de tu JSON)
     let bumpers = biblioteca.filter(v => v.tipo === "archive" && v.bloque.trim() === "bumper");
     if (bumpers.length === 0) return null;
 
-    // No repetir el mismo bumper dos veces seguidas si hay más de uno
     if (bumpers.length > 1) {
         const sinRepetir = bumpers.filter(v => v.id !== ultimoBumperId);
         if (sinRepetir.length > 0) bumpers = sinRepetir;
     }
 
-    // Selección ponderada por "peso" (útil cuando haya avisos que deban salir más seguido que otros)
     let pool = [];
     bumpers.forEach(b => { for (let i = 0; i < (b.peso || 1); i++) pool.push(b); });
 
@@ -281,16 +172,13 @@ function elegirSiguiente(bloqueDeseado = null) {
         return null;
     }
     
-    // ✅ FILTRO MÁS PERMISIVO: solo excluir el ÚLTIMO video visto
     if (candidatos.length > 1) {
         if (esZapping) {
-            // Zapping: excluir solo el último
             const ultimoId = historialReciente.slice(-1)[0];
             if (ultimoId) {
                 candidatos = candidatos.filter(v => v.id !== ultimoId);
             }
         } else {
-            // Categoría específica: excluir solo el último de esa categoría
             const histCategoria = getHistorialCategoria(bloqueDeseado);
             const ultimoId = histCategoria.slice(-1)[0];
             if (ultimoId) {
@@ -299,7 +187,6 @@ function elegirSiguiente(bloqueDeseado = null) {
         }
     }
     
-    // Si no quedan candidatos, usar todos (permitir repetición)
     if (candidatos.length === 0) {
         candidatos = biblioteca.filter(v => {
             if (v.tipo !== "archive") return false;
@@ -310,13 +197,11 @@ function elegirSiguiente(bloqueDeseado = null) {
         });
     }
     
-    // Selección ponderada
     let pool = [];
     candidatos.forEach(v => { 
         for (let i = 0; i < (v.peso || 1); i++) pool.push(v); 
     });
     
-    // Mezclar para evitar sesgo
     for (let i = pool.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [pool[i], pool[j]] = [pool[j], pool[i]];
@@ -337,7 +222,7 @@ function generarMenuOSD() {
     const opciones = [
         { label: "📺 ZAPPING", accion: () => cambiarCanal('zapping') },
         { label: "🔍 MISTERIO", accion: () => cambiarCanal('misterio') },
-        { label: " GEOPOLÍTICA", accion: () => cambiarCanal('historia') },
+        { label: "🌍 GEOPOLÍTICA", accion: () => cambiarCanal('historia') },
         { label: "🧪 CIENCIA", accion: () => cambiarCanal('ciencia') },
         { label: "🕉️ ESPIRITUALIDAD", accion: () => cambiarCanal('espiritualidad') },
         { label: "🔮 VIERNES MÍSTICOS", accion: () => cambiarCanal('viernes') },
@@ -366,7 +251,6 @@ function apagarTV() {
     document.getElementById('sintonia').style.display = 'block';
     document.getElementById('osd-menu').classList.remove('activo');
 
-    // ✅ LIMPIAR TIMEOUTS E INTERVALOS
     if (osdTimeout) clearTimeout(osdTimeout);
     if (osdIntervalo) clearInterval(osdIntervalo);
     limpiarColaOSD();
@@ -494,12 +378,8 @@ function mostrarEnPantalla(item, offsetSegundos = 0) {
     document.getElementById('marco-tv').appendChild(flash);
     setTimeout(() => flash.remove(), 400);
 
-    // ✅ LIMPIAR EL PULSO DE PRESENCIA ANTERIOR
     if (osdIntervalo) clearInterval(osdIntervalo);
 
-    // Marca de presencia del canal: aparece ahora, y se repite cada 5 minutos
-    // mientras dure este mismo video ("Ey, estamos aquí, estás viendo...").
-    // Los bumpers no llevan cartel — son cortos y no tiene sentido anunciarlos.
     if (item.bloque !== 'bumper') {
         encolarOSD('titulo', item.titulo);
         osdIntervalo = setInterval(() => {
@@ -507,8 +387,6 @@ function mostrarEnPantalla(item, offsetSegundos = 0) {
         }, OSD_INTERVALO_PULSO);
     }
 
-    // Si lo que arranca es contenido (no un bumper), ya elegimos ahora el próximo,
-    // así el anuncio "A CONTINUACIÓN" y lo que realmente se reproduce después son lo mismo.
     if (item.tipo === 'archive' && item.bloque !== 'bumper') {
         prepararProximoContenido();
     }
@@ -546,7 +424,6 @@ function cambiarCapaVideo(url, offset, item) {
         capaNueva.dataset.targetOffset = offset;
         capaNueva.dataset.randomStart = 'false';
     } else if (item && item.bloque === 'bumper') {
-        // Los bumpers siempre arrancan desde el principio, nunca "empezados"
         capaNueva.dataset.randomStart = 'false';
         delete capaNueva.dataset.targetOffset;
     } else {
@@ -600,8 +477,6 @@ document.getElementById('marco-tv').addEventListener('click', function(e) {
     if (activeLayer.paused) { activeLayer.play(); } else { activeLayer.pause(); }
 });
 
-// Elige (y reserva) cuál va a ser el próximo video de contenido, respetando el canal actual.
-// Se llama apenas arranca un video de contenido, para tenerlo listo cuando toque anunciarlo.
 function prepararProximoContenido() {
     if (bloqueActual && bloqueActual !== 'zapping') {
         proximoContenido = elegirSiguiente(bloqueActual);
@@ -610,9 +485,6 @@ function prepararProximoContenido() {
     }
 }
 
-// Sistema de cola para los carteles OSD (osd-titulo / osd-proximo).
-// Garantiza que nunca se vean los dos al mismo tiempo: si hay uno visible,
-// el siguiente espera su turno y aparece recién cuando el anterior termina.
 function encolarOSD(tipo, texto) {
     colaOSD.push({ tipo, texto });
     procesarColaOSD();
@@ -631,7 +503,7 @@ function procesarColaOSD() {
     osdTimeout = setTimeout(() => {
         el.classList.remove('visible');
         procesandoOSD = false;
-        setTimeout(procesarColaOSD, 400); // pequeño respiro antes de que entre el próximo, si hay uno esperando
+        setTimeout(procesarColaOSD, 400);
     }, OSD_DURACION_VISIBLE);
 }
 
@@ -645,15 +517,11 @@ function limpiarColaOSD() {
     if (p) p.classList.remove('visible');
 }
 
-// Decide qué mostrar a continuación (video normal o bumper). La usan tanto
-// el final natural de un video ('ended') como la recuperación por error.
 function avanzarProgramacion() {
     if (!tvEncendida) return;
 
     const terminoUnBumper = itemActual && itemActual.bloque === 'bumper';
 
-    // Si lo que acaba de terminar fue un video de CONTENIDO (no un bumper),
-    // siempre metemos un bumper antes de pasar al próximo video.
     if (!terminoUnBumper) {
         const bumper = elegirBumper();
         if (bumper) {
@@ -663,8 +531,6 @@ function avanzarProgramacion() {
         }
     }
 
-    // Termina acá si: el que acaba de terminar fue un bumper (toca el próximo contenido),
-    // o no hay bumpers cargados todavía.
     if (proximoContenido) {
         const siguiente = proximoContenido;
         proximoContenido = null;
@@ -672,7 +538,6 @@ function avanzarProgramacion() {
         return;
     }
 
-    // Red de seguridad por si proximoContenido no se llegó a preparar
     if (bloqueActual && bloqueActual !== 'zapping') {
         reproducirBloqueFijo(bloqueActual);
     } else {
@@ -687,10 +552,8 @@ const MAX_FALLOS_SEGUIDOS = 3;
 document.querySelectorAll('.video-layer').forEach(layer => {
     layer.addEventListener('loadedmetadata', function() {
         if (this.dataset.randomStart === 'true') {
-            // Arranca en un punto proporcional a la duración real (no un tiempo fijo),
-            // para que un documental corto no pierda 5-7 minutos parejo con uno largo.
-            const PORCENTAJE_MIN = 0.04; // 4% del video
-            const PORCENTAJE_MAX = 0.09; // 9% del video
+            const PORCENTAJE_MIN = 0.04;
+            const PORCENTAJE_MAX = 0.09;
             if (this.duration && isFinite(this.duration)) {
                 const porcentaje = PORCENTAJE_MIN + Math.random() * (PORCENTAJE_MAX - PORCENTAJE_MIN);
                 this.currentTime = this.duration * porcentaje;
@@ -704,13 +567,10 @@ document.querySelectorAll('.video-layer').forEach(layer => {
     });
 
     layer.addEventListener('ended', function() {
-        fallosSeguidos = 0; // terminó bien, resetea el contador de fallos
+        fallosSeguidos = 0;
         avanzarProgramacion();
     });
 
-    // Al llegar a los 2/3 del video de contenido actual, anuncia el próximo (una sola vez por video).
-    // Primero marca presencia ("estás viendo") y, apenas ese termina, entra "a continuación" —
-    // nunca los dos juntos, gracias a la cola.
     layer.addEventListener('timeupdate', function() {
         if (!this.classList.contains('activa')) return;
         if (!itemActual || itemActual.bloque === 'bumper') return;
@@ -723,9 +583,6 @@ document.querySelectorAll('.video-layer').forEach(layer => {
         }
     });
 
-    // Un video roto (404, formato no soportado, etc.) ya no se queda trabado en estática:
-    // después de una pausa breve, salta al siguiente. Si varios seguidos fallan, se corta
-    // la señal en vez de reintentar en bucle infinito.
     layer.addEventListener('error', function() {
         if (!tvEncendida) return;
         fallosSeguidos++;
@@ -750,12 +607,10 @@ document.addEventListener('click', function (e) {
 
 generarMenuOSD();
 
-// ✅ INICIO CORRECTO: Una sola llamada a validarBiblioteca()
-cargarPlaylist().then(() => {
-    validarBiblioteca();
-});
+// ✅ INICIO: Cargar playlist y arrancar (sin validación)
+cargarPlaylist();
 
-let viewerCount = Math.floor(Math.random() * (25 - 8 + 1)) + 8; // arranca distinto en cada visita (entre 8 y 25)
+let viewerCount = Math.floor(Math.random() * (25 - 8 + 1)) + 8;
 function actualizarViewers() {
     const el = document.getElementById('viewer-count');
     if (el) {
@@ -768,7 +623,6 @@ function actualizarViewers() {
 actualizarViewers();
 
 // --- CONTROL DE ESTÁTICA ---
-// ✅ AHORA EL ELEMENTO EXISTE EN EL HTML
 const capaEstatica = document.getElementById('estatica');
 
 function mostrarEstatica() { if (capaEstatica) capaEstatica.classList.add('visible'); }
