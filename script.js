@@ -139,7 +139,7 @@ async function validarBiblioteca() {
     if (overlay) overlay.classList.add('visible');
 
     const estado = document.getElementById('estado-cargando');
-    const cacheKey = 'laclara_tv_validacion_v5';
+	const cacheKey = 'laclara_tv_validacion_v7';
     const cache = JSON.parse(localStorage.getItem(cacheKey));
     const ahora = Date.now();
 
@@ -181,12 +181,19 @@ async function validarBiblioteca() {
                     }
                 }
                 return null;
-            } catch (e) { 
-                // ✅ SI FALLA EL FETCH (por file://), USAR URL POR DEFECTO
-                v.url_video = `https://archive.org/download/${v.id}/${v.id}.mp4`;
-                return v;
-            }
-        }));
+            } catch (e) {
+				console.warn('⚠️ Validación por API fallida (ej. modo local). Activando protocolo de respaldo múltiple...');
+				biblioteca.forEach(v => {
+				if (v.tipo === 'archive' && !v.url_video) {
+            // Creamos un array de posibles URLs. El navegador probará en orden.
+				v.url_video_respaldo = [
+                `https://archive.org/download/${v.id}/${v.id}_512kb.mp4`,
+                `https://archive.org/download/${v.id}/${v.id}.mp4`,
+                `https://archive.org/download/${v.id}/${v.id}_h264.mp4`
+            ];
+        }
+    });
+}
 
         const itemsValidos = resultados.filter(Boolean);
         const idsValidos = new Set(itemsValidos.map(v => v.id));
@@ -539,7 +546,26 @@ function cambiarCapaVideo(url, offset, item) {
     const capaNueva = capaActiva === 1 ? layer2 : layer1;
 
     capaVieja.pause();
+    // Limpiar fuentes anteriores
+	capaNueva.innerHTML = ''; 
+
+		if (item.url_video_respaldo && item.url_video_respaldo.length > 0) {
+    // Si tenemos respaldos, crear etiquetas <source> para que el navegador elija la que ande
+		item.url_video_respaldo.forEach(respaldoUrl => {
+        const source = document.createElement('source');
+        source.src = respaldoUrl;
+        source.type = 'video/mp4';
+        capaNueva.appendChild(source);
+    });
+    // Intentar cargar la principal también por si acaso
+    const sourceMain = document.createElement('source');
+    sourceMain.src = item.url_video;
+    sourceMain.type = 'video/mp4';
+    capaNueva.appendChild(sourceMain);
+} else {
+    // Comportamiento normal si la validación por API funcionó bien
     capaNueva.src = url;
+}
     capaNueva.dataset.anuncioHecho = 'false';
     
     if (offset > 0) {
@@ -727,24 +753,31 @@ document.querySelectorAll('.video-layer').forEach(layer => {
     // después de una pausa breve, salta al siguiente. Si varios seguidos fallan, se corta
     // la señal en vez de reintentar en bucle infinito.
     layer.addEventListener('error', function() {
-        if (!tvEncendida) return;
-        fallosSeguidos++;
-        console.warn('⚠️ Error al cargar el video, saltando al siguiente', fallosSeguidos);
-        if (fallosSeguidos > MAX_FALLOS_SEGUIDOS) {
-            console.warn('⚠️ Demasiados fallos seguidos, cortando la señal.');
-            fallosSeguidos = 0;
-            mostrarFueraDeAire();
-            return;
-        }
-        setTimeout(avanzarProgramacion, 2000);
-    });
-});
-
-document.addEventListener('click', function (e) {
-    const menu = document.getElementById('osd-menu');
-    const btnMenu = document.getElementById('btn-menu');
-    if (menu.classList.contains('activo') && !menu.contains(e.target) && e.target !== btnMenu) {
-        menu.classList.remove('activo');
+    if (!tvEncendida) return;
+    
+    const idFallido = itemActual ? itemActual.id : 'desconocido';
+    console.warn(`⚠️ VIDEO ROTO DETECTADO: ${idFallido}. Auto-curación activada...`);
+    
+    // 1. Marcar este ID como malo para no volver a elegirlo en esta sesión
+    if (itemActual && itemActual.id) {
+        historialReciente.push(itemActual.id + "_ROTO"); 
+    }
+    
+    // 2. INVALIDAR EL CACHÉ LOCAL SILICIOSAMENTE
+    // Si un video falló, el caché guardado probablemente tenga URLs malas.
+    // Lo borramos para que la próxima vez que el usuario entre, se re-valide todo.
+    localStorage.removeItem('laclara_tv_validacion_v7');
+    
+    // 3. Saltar al siguiente video inmediatamente (el usuario solo verá un parpadeo)
+    fallosSeguidos++;
+    if (fallosSeguidos > MAX_FALLOS_SEGUIDOS) {
+        console.warn('⚠️ Demasiados fallos seguidos. Mostrando pantalla de mantenimiento.');
+        mostrarFueraDeAire();
+    } else {
+        setTimeout(() => {
+            fallosSeguidos = 0; // Resetear para dar una nueva oportunidad al siguiente
+            avanzarProgramacion();
+        }, 500); // 500ms es imperceptible, parece un cambio de canal rápido
     }
 });
 
