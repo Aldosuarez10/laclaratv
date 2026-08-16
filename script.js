@@ -119,28 +119,32 @@ async function cargarPlaylist() {
 
 async function validarBiblioteca() {
     const overlay = document.getElementById('overlay-carga');
-    if (overlay) overlay.classList.add('visible');
     const estado = document.getElementById('estado-cargando');
-    const cacheKey = 'laclara_tv_validacion_v7';
+    if (overlay) overlay.classList.add('visible');
+    if (estado) estado.textContent = 'SINTONIZANDO SEÑAL...';
+
+    const cacheKey = 'laclara_tv_validacion_v8';
     const cache = JSON.parse(localStorage.getItem(cacheKey));
     const ahora = Date.now();
 
     if (cache && (ahora - cache.timestamp < 86400000)) {
         biblioteca = cache.bibliotecaValida;
         bibliotecaLista = true;
-        console.log("✅ Señal restaurada desde caché");
         if (overlay) overlay.classList.remove('visible');
         return;
     }
 
-    if (estado) estado.textContent = 'VERIFICANDO SEÑAL...';
     const itemsArchive = biblioteca.filter(v => v.tipo === 'archive');
-
-    try {
-        const resultados = await Promise.all(itemsArchive.map(async v => {
+    
+    // VALIDACIÓN POR LOTES (De a 5 para no colapsar Archive.org)
+    const TAMANO_LOTE = 5;
+    for (let i = 0; i < itemsArchive.length; i += TAMANO_LOTE) {
+        const lote = itemsArchive.slice(i, i + TAMANO_LOTE);
+        
+        await Promise.all(lote.map(async v => {
             try {
                 const res = await fetch(`https://archive.org/metadata/${v.id}`);
-                if (!res.ok) return null;
+                if (!res.ok) return;
                 const data = await res.json();
                 if (data && data.metadata && data.metadata.identifier) {
                     const candidatos = data.files.filter(f =>
@@ -150,76 +154,19 @@ async function validarBiblioteca() {
                         const derivados = candidatos.filter(f => f.source === 'derivative');
                         const pool = derivados.length > 0 ? derivados : candidatos;
                         pool.sort((a, b) => (parseInt(a.size) || Infinity) - (parseInt(b.size) || Infinity));
-                        const mp4File = pool[0];
-                        v.url_video = `https://archive.org/download/${v.id}/${mp4File.name}`;
-                        return v;
+                        v.url_video = `https://archive.org/download/${v.id}/${pool[0].name}`;
                     }
                 }
-                return null;
             } catch (e) {
                 v.url_video = `https://archive.org/download/${v.id}/${v.id}.mp4`;
-                return v;
             }
         }));
-
-        const itemsValidos = resultados.filter(Boolean);
-        const idsValidos = new Set(itemsValidos.map(v => v.id));
-        const idsDescartados = itemsArchive.filter(v => !idsValidos.has(v.id)).map(v => v.id);
-
-        for (let i = biblioteca.length - 1; i >= 0; i--) {
-            if (biblioteca[i].tipo === 'archive') {
-                if (idsValidos.has(biblioteca[i].id)) {
-                    biblioteca[i] = itemsValidos.find(v => v.id === biblioteca[i].id);
-                } else {
-                    biblioteca.splice(i, 1);
-                }
-            }
-        }
-
-        if (idsDescartados.length > 0) {
-            console.warn('Enlaces descartados:', idsDescartados);
-        }
-    } catch (e) {
-        console.warn('⚠️ Validación fallida, usando playlist.json directamente');
-        biblioteca.forEach(v => {
-            if (v.tipo === 'archive' && !v.url_video) {
-                v.url_video = `https://archive.org/download/${v.id}/${v.id}.mp4`;
-            }
-        });
     }
 
-    localStorage.setItem(cacheKey, JSON.stringify({
-        timestamp: ahora,
-        bibliotecaValida: biblioteca
-    }));
-
+    localStorage.setItem(cacheKey, JSON.stringify({ timestamp: ahora, bibliotecaValida: biblioteca }));
     bibliotecaLista = true;
     if (estado) estado.textContent = '';
     if (overlay) overlay.classList.remove('visible');
-
-    const archives = biblioteca.filter(v => v.tipo === 'archive');
-    if (archives.length === 0) {
-        mostrarFueraDeAire();
-    } else {
-        ocultarFueraDeAire();
-        console.log(` ${archives.length} videos disponibles`);
-    }
-}
-
-let ultimoBumperId = null;
-
-function elegirBumper() {
-    let bumpers = biblioteca.filter(v => v.tipo === "archive" && v.bloque.trim() === "bumper");
-    if (bumpers.length === 0) return null;
-    if (bumpers.length > 1) {
-        const sinRepetir = bumpers.filter(v => v.id !== ultimoBumperId);
-        if (sinRepetir.length > 0) bumpers = sinRepetir;
-    }
-    let pool = [];
-    bumpers.forEach(b => { for (let i = 0; i < (b.peso || 1); i++) pool.push(b); });
-    const elegido = pool[Math.floor(Math.random() * pool.length)];
-    ultimoBumperId = elegido.id;
-    return elegido;
 }
 
 function elegirSiguiente(bloqueDeseado = null) {
