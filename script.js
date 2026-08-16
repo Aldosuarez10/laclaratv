@@ -52,6 +52,7 @@ async function cargarPlaylist() {
         const res = await fetch('playlist.json');
         if (!res.ok) throw new Error('No se encontró la programación');
         const data = await res.json();
+        
         biblioteca = data.map(item => {
             const limpio = {};
             for (let clave in item) {
@@ -71,7 +72,7 @@ async function cargarPlaylist() {
         const overlay = document.getElementById('overlay-carga');
         if (overlay) overlay.classList.remove('visible');
     } catch (error) {
-        biblioteca = [...bibliotecaDefault];
+        console.warn("No se pudo cargar playlist.json", error);
         bibliotecaLista = true;
         const overlay = document.getElementById('overlay-carga');
         if (overlay) overlay.classList.remove('visible');
@@ -84,7 +85,7 @@ async function validarBiblioteca() {
     if (overlay) overlay.classList.add('visible');
     if (estado) estado.textContent = 'SINTONIZANDO SEÑAL...';
 
-    const cacheKey = 'laclara_tv_validacion_v9';
+    const cacheKey = 'laclara_tv_validacion_v10';
     const cache = JSON.parse(localStorage.getItem(cacheKey));
     const ahora = Date.now();
 
@@ -185,8 +186,8 @@ function elegirSiguiente(bloqueDeseado = null) {
 function generarMenuOSD() {
     const menuContainer = document.getElementById('menu-dinamico');
     const opciones = [
-        { label: "📺 ZAPPING", accion: () => cambiarCanal('zapping') },
-        { label: "🔍 MISTERIO", accion: () => cambiarCanal('misterio') },
+        { label: " ZAPPING", accion: () => cambiarCanal('zapping') },
+        { label: " MISTERIO", accion: () => cambiarCanal('misterio') },
         { label: "📜 GEOPOLÍTICA", accion: () => cambiarCanal('historia') },
         { label: "🧪 CIENCIA", accion: () => cambiarCanal('ciencia') },
         { label: "🕉️ ESPIRITUALIDAD", accion: () => cambiarCanal('espiritualidad') },
