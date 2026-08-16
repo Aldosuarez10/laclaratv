@@ -1,27 +1,6 @@
-// ============================================================
-//  @LaClaraTV - Script (Versión Limpia)
-// ============================================================
-
-const bibliotecaDefault = [
-    { id: "bamper-central-1", titulo: "Bumper Central 1", bloque: "bumper", peso: 12, tipo: "archive", duracion: 15000 },
-    { id: "bamper-2", titulo: "Bumper Central 2", bloque: "bumper", peso: 12, tipo: "archive", duracion: 15000 },
-    { id: "bamper-3", titulo: "Bumper Central 3", bloque: "bumper", peso: 12, tipo: "archive", duracion: 15000 },
-    { id: "las-fallas-de-la-arqueologia", titulo: "Las Fallas De La Arqueologia", bloque: "ciencia", peso: 12, tipo: "archive" },
-    { id: "astronomia-vieja-impostora", titulo: "Astronomia Vieja Impostora", bloque: "ciencia", peso: 12, tipo: "archive" },
-    { id: "antartida-la-tierra-prohibida-aportes-la-claraboya", titulo: "Antartida La Tierra Prohibida", bloque: "ciencia", peso: 12, tipo: "archive" },
-    { id: "la-rueda-de-samsara", titulo: "La Rueda de Samsara", bloque: "espiritualidad", peso: 12, tipo: "archive" },
-    { id: "TheSecretLandHighJump194769min", titulo: "The Secret Land (Operacion Highjump)", bloque: "misterio", peso: 9, tipo: "archive" },
-    { id: "Pre-Columbian_Trans-Oceanic_Contact", titulo: "Contacto Transoceanico Precolombino", bloque: "historia", peso: 9, tipo: "archive" },
-    { id: "ovni-miguel-pedrero", titulo: "OVNI: Una Explicacion que no va a Gustar a Nadie", bloque: "misterio", peso: 9, tipo: "archive" },
-    { id: "energia-libre-carrera-hacia-el-punto-cero", titulo: "Energia Libre: Carrera Hacia el Punto Cero", bloque: "ciencia", peso: 9, tipo: "archive" },
-    { id: "DocumentalELSECRETOLALEYDELAATRACCIONTheSecretEspanol", titulo: "El Secreto: La Ley de la Atraccion", bloque: "espiritualidad", peso: 9, tipo: "archive" },
-    { id: "viernes", titulo: "Viernes Misticos", bloque: "externo", url: "https://aldosuarez10.github.io/viernes-misticos-radio/", tipo: "web" },
-    { id: "universo", titulo: "Universo 2 Anillo", bloque: "externo", url: "https://aldosuarez10.github.io/universo_segundo_anillo/", tipo: "web" }
-];
-
+const bibliotecaDefault = [];
 let biblioteca = [...bibliotecaDefault];
 let tvEncendida = false;
-let colaBumpers = [];
 let historialReciente = [];
 const MAX_HISTORIAL = 8;
 let timerAvance = null;
@@ -39,37 +18,33 @@ const OSD_INTERVALO_PULSO = 300000;
 const historialPorCategoria = {};
 
 function getHistorialCategoria(categoria) {
-    if (!historialPorCategoria[categoria]) {
-        historialPorCategoria[categoria] = [];
-    }
+    if (!historialPorCategoria[categoria]) historialPorCategoria[categoria] = [];
     return historialPorCategoria[categoria];
 }
 
 function agregarAlHistorial(item) {
     if (!item || !item.bloque) return;
     historialReciente.push(item.id);
-    if (historialReciente.length > MAX_HISTORIAL) {
-        historialReciente.shift();
-    }
-    if (!historialPorCategoria[item.bloque]) {
-        historialPorCategoria[item.bloque] = [];
-    }
+    if (historialReciente.length > MAX_HISTORIAL) historialReciente.shift();
+    if (!historialPorCategoria[item.bloque]) historialPorCategoria[item.bloque] = [];
     historialPorCategoria[item.bloque].push(item.id);
-    if (historialPorCategoria[item.bloque].length > MAX_HISTORIAL) {
-        historialPorCategoria[item.bloque].shift();
-    }
+    if (historialPorCategoria[item.bloque].length > MAX_HISTORIAL) historialPorCategoria[item.bloque].shift();
 }
 
 function mostrarFueraDeAire() {
     const overlay = document.getElementById('overlay-carga');
     if (overlay) overlay.classList.remove('visible');
-    document.getElementById('pantalla-fuera-aire').style.display = 'flex';
-    document.getElementById('contenedor-tv').style.display = 'none';
+    const fueraAire = document.getElementById('pantalla-fuera-aire');
+    if (fueraAire) fueraAire.style.display = 'flex';
+    const contenedor = document.getElementById('contenedor-tv');
+    if (contenedor) contenedor.style.display = 'none';
 }
 
 function ocultarFueraDeAire() {
-    document.getElementById('pantalla-fuera-aire').style.display = 'none';
-    document.getElementById('contenedor-tv').style.display = 'block';
+    const fueraAire = document.getElementById('pantalla-fuera-aire');
+    if (fueraAire) fueraAire.style.display = 'none';
+    const contenedor = document.getElementById('contenedor-tv');
+    if (contenedor) contenedor.style.display = 'block';
 }
 
 async function cargarPlaylist() {
@@ -92,25 +67,11 @@ async function cargarPlaylist() {
                 item.url_video = `https://archive.org/download/${item.id}/${item.id}.mp4`;
             }
         });
-
-        console.log(`✅ Playlist.json cargada: ${biblioteca.length} items.`);
         bibliotecaLista = true;
         const overlay = document.getElementById('overlay-carga');
         if (overlay) overlay.classList.remove('visible');
-
-        const porCategoria = {};
-        biblioteca.filter(v => v.tipo === 'archive').forEach(v => {
-            porCategoria[v.bloque] = (porCategoria[v.bloque] || 0) + 1;
-        });
-        console.table(porCategoria);
     } catch (error) {
-        console.warn("No se pudo cargar playlist.json, usando biblioteca por defecto.", error);
         biblioteca = [...bibliotecaDefault];
-        biblioteca.forEach(item => {
-            if (item.tipo === 'archive') {
-                item.url_video = `https://archive.org/download/${item.id}/${item.id}.mp4`;
-            }
-        });
         bibliotecaLista = true;
         const overlay = document.getElementById('overlay-carga');
         if (overlay) overlay.classList.remove('visible');
@@ -123,7 +84,7 @@ async function validarBiblioteca() {
     if (overlay) overlay.classList.add('visible');
     if (estado) estado.textContent = 'SINTONIZANDO SEÑAL...';
 
-    const cacheKey = 'laclara_tv_validacion_v8';
+    const cacheKey = 'laclara_tv_validacion_v9';
     const cache = JSON.parse(localStorage.getItem(cacheKey));
     const ahora = Date.now();
 
@@ -135,12 +96,10 @@ async function validarBiblioteca() {
     }
 
     const itemsArchive = biblioteca.filter(v => v.tipo === 'archive');
-    
-    // VALIDACIÓN POR LOTES (De a 5 para no colapsar Archive.org)
     const TAMANO_LOTE = 5;
+    
     for (let i = 0; i < itemsArchive.length; i += TAMANO_LOTE) {
         const lote = itemsArchive.slice(i, i + TAMANO_LOTE);
-        
         await Promise.all(lote.map(async v => {
             try {
                 const res = await fetch(`https://archive.org/metadata/${v.id}`);
@@ -169,53 +128,47 @@ async function validarBiblioteca() {
     if (overlay) overlay.classList.remove('visible');
 }
 
+let ultimoBumperId = null;
+function elegirBumper() {
+    let bumpers = biblioteca.filter(v => v.tipo === "archive" && v.bloque.trim() === "bumper");
+    if (bumpers.length === 0) return null;
+    if (bumpers.length > 1) {
+        const sinRepetir = bumpers.filter(v => v.id !== ultimoBumperId);
+        if (sinRepetir.length > 0) bumpers = sinRepetir;
+    }
+    let pool = [];
+    bumpers.forEach(b => { for (let i = 0; i < (b.peso || 1); i++) pool.push(b); });
+    const elegido = pool[Math.floor(Math.random() * pool.length)];
+    ultimoBumperId = elegido.id;
+    return elegido;
+}
+
 function elegirSiguiente(bloqueDeseado = null) {
     const esZapping = (bloqueDeseado === null || bloqueDeseado === 'zapping');
     let candidatos = biblioteca.filter(v => {
         if (v.tipo !== "archive") return false;
-        if (bloqueDeseado && bloqueDeseado !== 'zapping') {
-            return v.bloque === bloqueDeseado;
-        }
+        if (bloqueDeseado && bloqueDeseado !== 'zapping') return v.bloque === bloqueDeseado;
         return v.bloque !== "bumper";
     });
 
     if (candidatos.length === 0) {
-        if (bloqueDeseado && bloqueDeseado !== 'zapping') {
-            return elegirSiguiente('zapping');
-        }
+        if (bloqueDeseado && bloqueDeseado !== 'zapping') return elegirSiguiente('zapping');
         return null;
     }
 
     if (candidatos.length > 1) {
         if (esZapping) {
             const ultimoId = historialReciente.slice(-1)[0];
-            if (ultimoId) {
-                candidatos = candidatos.filter(v => v.id !== ultimoId);
-            }
+            if (ultimoId) candidatos = candidatos.filter(v => v.id !== ultimoId);
         } else {
             const histCategoria = getHistorialCategoria(bloqueDeseado);
             const ultimoId = histCategoria.slice(-1)[0];
-            if (ultimoId) {
-                candidatos = candidatos.filter(v => v.id !== ultimoId);
-            }
+            if (ultimoId) candidatos = candidatos.filter(v => v.id !== ultimoId);
         }
     }
 
-    if (candidatos.length === 0) {
-        candidatos = biblioteca.filter(v => {
-            if (v.tipo !== "archive") return false;
-            if (bloqueDeseado && bloqueDeseado !== 'zapping') {
-                return v.bloque === bloqueDeseado;
-            }
-            return v.bloque !== "bumper";
-        });
-    }
-
     let pool = [];
-    candidatos.forEach(v => {
-        for (let i = 0; i < (v.peso || 1); i++) pool.push(v);
-    });
-
+    candidatos.forEach(v => { for (let i = 0; i < (v.peso || 1); i++) pool.push(v); });
     for (let i = pool.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [pool[i], pool[j]] = [pool[j], pool[i]];
@@ -224,7 +177,6 @@ function elegirSiguiente(bloqueDeseado = null) {
     if (pool.length > 0) {
         const elegido = pool[Math.floor(Math.random() * pool.length)];
         agregarAlHistorial(elegido);
-        console.log(` Elegido: ${elegido.titulo} (${elegido.bloque})`);
         return elegido;
     }
     return null;
@@ -234,7 +186,7 @@ function generarMenuOSD() {
     const menuContainer = document.getElementById('menu-dinamico');
     const opciones = [
         { label: "📺 ZAPPING", accion: () => cambiarCanal('zapping') },
-        { label: " MISTERIO", accion: () => cambiarCanal('misterio') },
+        { label: "🔍 MISTERIO", accion: () => cambiarCanal('misterio') },
         { label: "📜 GEOPOLÍTICA", accion: () => cambiarCanal('historia') },
         { label: "🧪 CIENCIA", accion: () => cambiarCanal('ciencia') },
         { label: "🕉️ ESPIRITUALIDAD", accion: () => cambiarCanal('espiritualidad') },
@@ -248,11 +200,6 @@ function generarMenuOSD() {
 function ejecutarAccionMenu(elemento) {
     const index = Array.from(elemento.parentNode.children).indexOf(elemento);
     window.opcionesMenu[index].accion();
-}
-
-function toggleTV(e) {
-    if (e) e.stopPropagation();
-    if (tvEncendida) { apagarTV(); } else { encenderTV(e); }
 }
 
 function apagarTV() {
@@ -272,26 +219,6 @@ function apagarTV() {
     if (layer1) { layer1.pause(); layer1.removeAttribute('src'); }
     if (layer2) { layer2.pause(); layer2.removeAttribute('src'); }
     if (webFrame) { webFrame.src = 'about:blank'; }
-    if (window.osdIntervalo) clearInterval(window.osdIntervalo);
-}
-
-function cambiarVolumen(delta) {
-    var layer1 = document.getElementById('video-layer-1');
-    var layer2 = document.getElementById('video-layer-2');
-    [layer1, layer2].forEach(function(v) {
-        if (v) {
-            var nuevoVol = Math.min(1, Math.max(0, v.volume + delta));
-            v.volume = nuevoVol;
-        }
-    });
-    var vol = layer1 ? layer1.volume : (layer2 ? layer2.volume : 1);
-    var porcentaje = Math.round(vol * 100);
-    document.getElementById('barra-vol').style.width = porcentaje + '%';
-    document.getElementById('txt-vol').textContent = porcentaje + '%';
-    var osd = document.getElementById('osd-volumen');
-    osd.style.opacity = '1';
-    clearTimeout(window.volTimer);
-    window.volTimer = setTimeout(function() { osd.style.opacity = '0'; }, 2000);
 }
 
 function arrancarCuandoEsteLista() {
@@ -317,7 +244,6 @@ function encenderTV(e) {
         document.getElementById('pantalla-video').style.display = 'block';
         arrancarCuandoEsteLista();
     }, 500);
-    document.getElementById('contador-viewers').style.opacity = '1';
 }
 
 function abrirMenu(e) {
@@ -348,28 +274,11 @@ function cambiarCanal(bloque) {
     }
 
     const video = elegirSiguiente(bloque === 'zapping' ? null : bloque);
-    if (!video) {
-        if (bloque !== 'zapping') cambiarCanal('zapping');
-        return;
+    if (!video) { 
+        if (bloque !== 'zapping') cambiarCanal('zapping'); 
+        return; 
     }
     mostrarEnPantalla(video);
-}
-
-function reproducirBloqueFijo(bloque) {
-    const video = elegirSiguiente(bloque);
-    if (!video) { cambiarCanal('zapping'); return; }
-    mostrarEnPantalla(video);
-}
-
-function reproducirSiguienteEnCola() {
-    if (colaBumpers.length > 0) {
-        const bumper = colaBumpers.shift();
-        mostrarEnPantalla(bumper);
-    } else {
-        const video = elegirSiguiente();
-        if (!video) return;
-        mostrarEnPantalla(video);
-    }
 }
 
 function mostrarEnPantalla(item, offsetSegundos = 0) {
@@ -384,9 +293,7 @@ function mostrarEnPantalla(item, offsetSegundos = 0) {
 
     if (item.bloque !== 'bumper') {
         encolarOSD('titulo', item.titulo);
-        osdIntervalo = setInterval(() => {
-            encolarOSD('titulo', item.titulo);
-        }, OSD_INTERVALO_PULSO);
+        osdIntervalo = setInterval(() => { encolarOSD('titulo', item.titulo); }, OSD_INTERVALO_PULSO);
     }
 
     if (item.tipo === 'archive' && item.bloque !== 'bumper') {
@@ -440,43 +347,16 @@ function cambiarCapaVideo(url, offset, item) {
     capaActiva = capaActiva === 1 ? 2 : 1;
 }
 
-const eventosProgramados = [];
-let eventoActivoId = null;
-
-function verificarEventoProgramado() {
-    if (!tvEncendida) return;
-    const ahora = new Date();
-    const evento = eventosProgramados.find(e => ahora >= new Date(e.inicio) && ahora < new Date(e.fin));
-    if (evento && evento.id !== eventoActivoId) {
-        eventoActivoId = evento.id;
-        clearTimeout(timerAvance);
-        const offsetSegundos = Math.max(0, Math.floor((ahora - new Date(evento.inicio)) / 1000));
-        mostrarEnPantalla(evento, offsetSegundos);
-    } else if (!evento && eventoActivoId !== null) {
-        eventoActivoId = null;
-        cambiarCanal('zapping');
-    }
-}
-
-setInterval(verificarEventoProgramado, 15000);
-
 function actualizarReloj() {
     const ahora = new Date();
     const h = String(ahora.getHours()).padStart(2, '0');
     const m = String(ahora.getMinutes()).padStart(2, '0');
     const s = String(ahora.getSeconds()).padStart(2, '0');
-    document.getElementById('reloj-en-vivo').textContent = `${h}:${m}:${s}`;
+    const reloj = document.getElementById('reloj-en-vivo');
+    if (reloj) reloj.textContent = `${h}:${m}:${s}`;
 }
-
 setInterval(actualizarReloj, 1000);
 actualizarReloj();
-
-document.getElementById('marco-tv').addEventListener('click', function(e) {
-    if (!tvEncendida) return;
-    if (e.target.closest('#osd-menu') || e.target.closest('#control')) return;
-    const activeLayer = capaActiva === 1 ? document.getElementById('video-layer-1') : document.getElementById('video-layer-2');
-    if (activeLayer.paused) { activeLayer.play(); } else { activeLayer.pause(); }
-});
 
 function prepararProximoContenido() {
     if (bloqueActual && bloqueActual !== 'zapping') {
@@ -497,13 +377,15 @@ function procesarColaOSD() {
     if (!siguiente) return;
     procesandoOSD = true;
     const el = document.getElementById(siguiente.tipo === 'proximo' ? 'osd-proximo' : 'osd-titulo');
-    el.querySelector('.osd-texto').textContent = siguiente.texto;
-    el.classList.add('visible');
-    osdTimeout = setTimeout(() => {
-        el.classList.remove('visible');
-        procesandoOSD = false;
-        setTimeout(procesarColaOSD, 400);
-    }, OSD_DURACION_VISIBLE);
+    if (el) {
+        el.querySelector('.osd-texto').textContent = siguiente.texto;
+        el.classList.add('visible');
+        osdTimeout = setTimeout(() => {
+            el.classList.remove('visible');
+            procesandoOSD = false;
+            setTimeout(procesarColaOSD, 400);
+        }, OSD_DURACION_VISIBLE);
+    }
 }
 
 function limpiarColaOSD() {
@@ -523,7 +405,6 @@ function avanzarProgramacion() {
     if (!terminoUnBumper) {
         const bumper = elegirBumper();
         if (bumper) {
-            console.log("📺 Bumper:", bumper.titulo);
             mostrarEnPantalla(bumper);
             return;
         }
@@ -537,7 +418,8 @@ function avanzarProgramacion() {
     }
 
     if (bloqueActual && bloqueActual !== 'zapping') {
-        reproducirBloqueFijo(bloqueActual);
+        const video = elegirSiguiente(bloqueActual);
+        if (video) mostrarEnPantalla(video);
     } else {
         const video = elegirSiguiente();
         if (video) mostrarEnPantalla(video);
@@ -584,9 +466,7 @@ document.querySelectorAll('.video-layer').forEach(layer => {
     layer.addEventListener('error', function() {
         if (!tvEncendida) return;
         fallosSeguidos++;
-        console.warn('⚠️ Error al cargar el video, saltando al siguiente', fallosSeguidos);
         if (fallosSeguidos > MAX_FALLOS_SEGUIDOS) {
-            console.warn('⚠️ Demasiados fallos seguidos, cortando la señal.');
             fallosSeguidos = 0;
             mostrarFueraDeAire();
             return;
@@ -604,24 +484,7 @@ document.addEventListener('click', function(e) {
 });
 
 generarMenuOSD();
-
-cargarPlaylist().then(() => {
-    validarBiblioteca();
-});
-
-let viewerCount = Math.floor(Math.random() * (25 - 8 + 1)) + 8;
-
-function actualizarViewers() {
-    const el = document.getElementById('viewer-count');
-    if (el) {
-        const cambio = Math.floor(Math.random() * 3) - 1;
-        viewerCount = Math.max(8, Math.min(25, viewerCount + cambio));
-        el.textContent = viewerCount;
-    }
-    setTimeout(actualizarViewers, (Math.random() * 45000) + 45000);
-}
-
-actualizarViewers();
+cargarPlaylist().then(() => { validarBiblioteca(); });
 
 const capaEstatica = document.getElementById('estatica');
 function mostrarEstatica() { if (capaEstatica) capaEstatica.classList.add('visible'); }
@@ -635,11 +498,3 @@ videos.forEach(video => {
     video.addEventListener('playing', ocultarEstatica);
     video.addEventListener('canplay', ocultarEstatica);
 });
-
-const observerMenu = new MutationObserver(() => {
-    const webFrame = document.getElementById('web-frame');
-    if (webFrame && webFrame.style.display === 'block') {
-        ocultarEstatica();
-    }
-});
-observerMenu.observe(document.getElementById('web-frame'), { attributes: true, attributeFilter: ['style'] });
