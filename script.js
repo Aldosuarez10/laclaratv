@@ -1,4 +1,20 @@
-const bibliotecaDefault = [];
+const bibliotecaDefault = [
+    { id: "bamper-central-1", titulo: "Bumper Central 1", bloque: "bumper", peso: 12, tipo: "archive", duracion: 15000 },
+    { id: "bamper-2", titulo: "Bumper Central 2", bloque: "bumper", peso: 12, tipo: "archive", duracion: 15000 },
+    { id: "bamper-3", titulo: "Bumper Central 3", bloque: "bumper", peso: 12, tipo: "archive", duracion: 15000 },
+    { id: "las-fallas-de-la-arqueologia", titulo: "Las Fallas De La Arqueologia", bloque: "ciencia", peso: 12, tipo: "archive" },
+    { id: "astronomia-vieja-impostora", titulo: "Astronomia Vieja Impostora", bloque: "ciencia", peso: 12, tipo: "archive" },
+    { id: "antartida-la-tierra-prohibida-aportes-la-claraboya", titulo: "Antartida La Tierra Prohibida", bloque: "ciencia", peso: 12, tipo: "archive" },
+    { id: "la-rueda-de-samsara", titulo: "La Rueda de Samsara", bloque: "espiritualidad", peso: 12, tipo: "archive" },
+    { id: "TheSecretLandHighJump194769min", titulo: "The Secret Land (Operacion Highjump)", bloque: "misterio", peso: 9, tipo: "archive" },
+    { id: "Pre-Columbian_Trans-Oceanic_Contact", titulo: "Contacto Transoceanico Precolombino", bloque: "historia", peso: 9, tipo: "archive" },
+    { id: "ovni-miguel-pedrero", titulo: "OVNI: Una Explicacion que no va a Gustar a Nadie", bloque: "misterio", peso: 9, tipo: "archive" },
+    { id: "energia-libre-carrera-hacia-el-punto-cero", titulo: "Energia Libre: Carrera Hacia el Punto Cero", bloque: "ciencia", peso: 9, tipo: "archive" },
+    { id: "DocumentalELSECRETOLALEYDELAATRACCIONTheSecretEspanol", titulo: "El Secreto: La Ley de la Atraccion", bloque: "espiritualidad", peso: 9, tipo: "archive" },
+    { id: "viernes", titulo: "Viernes Misticos", bloque: "externo", url: "https://aldosuarez10.github.io/viernes-misticos-radio/", tipo: "web" },
+    { id: "universo", titulo: "Universo 2 Anillo", bloque: "externo", url: "https://aldosuarez10.github.io/universo_segundo_anillo/", tipo: "web" }
+];
+
 let biblioteca = [...bibliotecaDefault];
 let tvEncendida = false;
 let historialReciente = [];
@@ -73,6 +89,7 @@ async function cargarPlaylist() {
         if (overlay) overlay.classList.remove('visible');
     } catch (error) {
         console.warn("No se pudo cargar playlist.json", error);
+        biblioteca = [...bibliotecaDefault];
         bibliotecaLista = true;
         const overlay = document.getElementById('overlay-carga');
         if (overlay) overlay.classList.remove('visible');
@@ -85,7 +102,7 @@ async function validarBiblioteca() {
     if (overlay) overlay.classList.add('visible');
     if (estado) estado.textContent = 'SINTONIZANDO SEÑAL...';
 
-    const cacheKey = 'laclara_tv_validacion_v10';
+    const cacheKey = 'laclara_tv_validacion_v11';
     const cache = JSON.parse(localStorage.getItem(cacheKey));
     const ahora = Date.now();
 
@@ -186,8 +203,8 @@ function elegirSiguiente(bloqueDeseado = null) {
 function generarMenuOSD() {
     const menuContainer = document.getElementById('menu-dinamico');
     const opciones = [
-        { label: " ZAPPING", accion: () => cambiarCanal('zapping') },
-        { label: " MISTERIO", accion: () => cambiarCanal('misterio') },
+        { label: "📺 ZAPPING", accion: () => cambiarCanal('zapping') },
+        { label: "🔍 MISTERIO", accion: () => cambiarCanal('misterio') },
         { label: "📜 GEOPOLÍTICA", accion: () => cambiarCanal('historia') },
         { label: "🧪 CIENCIA", accion: () => cambiarCanal('ciencia') },
         { label: "🕉️ ESPIRITUALIDAD", accion: () => cambiarCanal('espiritualidad') },
@@ -214,9 +231,9 @@ function apagarTV() {
     if (osdTimeout) clearTimeout(osdTimeout);
     if (osdIntervalo) clearInterval(osdIntervalo);
     limpiarColaOSD();
-    var layer1 = document.getElementById('video-layer-1');
-    var layer2 = document.getElementById('video-layer-2');
-    var webFrame = document.getElementById('web-frame');
+    const layer1 = document.getElementById('video-layer-1');
+    const layer2 = document.getElementById('video-layer-2');
+    const webFrame = document.getElementById('web-frame');
     if (layer1) { layer1.pause(); layer1.removeAttribute('src'); }
     if (layer2) { layer2.pause(); layer2.removeAttribute('src'); }
     if (webFrame) { webFrame.src = 'about:blank'; }
