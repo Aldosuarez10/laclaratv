@@ -30,6 +30,50 @@ let videosReproducidos = [];
 let cargandoLoteEnFondo = false;
 let loteActualNumero = 0;
 
+const VISTOS_KEY = "laclara_vistos";
+const VISTOS_DIAS = 14;
+const VISTOS_MS = VISTOS_DIAS * 24 * 60 * 60 * 1000;
+const POZO_MINIMO = 8;
+const MARCAR_TRAS_MS = 120000;
+
+function leerVistos() {
+    try {
+        const raw = JSON.parse(localStorage.getItem(VISTOS_KEY) || "{}");
+        const ahora = Date.now();
+        const limpio = {};
+        for (const id in raw) {
+            if (ahora - Number(raw[id]) < VISTOS_MS) limpio[id] = raw[id];
+        }
+        return limpio;
+    } catch (e) {
+        return {};
+    }
+}
+
+function guardarVistos(map) {
+    try { localStorage.setItem(VISTOS_KEY, JSON.stringify(map)); } catch (e) {}
+}
+
+function marcarVisto(item) {
+    if (!item || !item.id || item.bloque === "bumper") return;
+    const map = leerVistos();
+    map[item.id] = Date.now();
+    guardarVistos(map);
+}
+
+function liberarMasViejos(candidatos, minimo) {
+    const map = leerVistos();
+    const orden = Object.entries(map).sort((a, b) => Number(a[1]) - Number(b[1]));
+    let frescos = candidatos.filter(v => !map[v.id]);
+    while (frescos.length < minimo && orden.length) {
+        const liberado = orden.shift();
+        delete map[liberado[0]];
+        frescos = candidatos.filter(v => !map[v.id]);
+    }
+    guardarVistos(map);
+    return frescos;
+}
+
 function esVideoDirecto(v) {
     return v && (v.tipo === "archive" || v.tipo === "odysee") && v.url_video;
 }
@@ -209,6 +253,14 @@ function elegirSiguiente(bloqueDeseado = null) {
         if (bloqueDeseado && bloqueDeseado !== "zapping") return elegirSiguiente("zapping");
         return null;
     }
+
+    const vistos = leerVistos();
+    let frescos = candidatos.filter(v => !vistos[v.id]);
+    if (frescos.length < Math.min(POZO_MINIMO, candidatos.length)) {
+        frescos = liberarMasViejos(candidatos, Math.min(POZO_MINIMO, candidatos.length));
+    }
+    if (frescos.length) candidatos = frescos;
+
     if (candidatos.length > 1) {
         const ultimoId = esZapping ? historialReciente.slice(-1)[0] : getHistorialCategoria(bloqueDeseado).slice(-1)[0];
         if (ultimoId) {
@@ -354,6 +406,12 @@ function cambiarCanal(bloque) {
 
 function mostrarEnPantalla(item, offsetSegundos = 0) {
     itemActual = item;
+    if (itemActual) {
+        itemActual._marcado = false;
+        itemActual._aireDesde = Date.now();
+    }
+    reintentosMismo = 0;
+    ultimoTiempoBueno = 0;
     limpiarColaOSD();
     const flash = document.createElement("div");
     flash.className = "flash-sintonia";
@@ -496,13 +554,25 @@ function avanzarProgramacion() {
 
 let fallosSeguidos = 0;
 const MAX_FALLOS_SEGUIDOS = 3;
+const MAX_REINTENTOS_MISMO = 2;
+let reintentosMismo = 0;
+let ultimoTiempoBueno = 0;
+
+function esLargo(duration) {
+    return duration && isFinite(duration) && duration >= 25 * 60;
+}
 
 document.querySelectorAll(".video-layer").forEach(layer => {
     layer.addEventListener("loadedmetadata", function () {
         if (this.dataset.randomStart === "true") {
             if (this.duration && isFinite(this.duration)) {
-                const porcentaje = 0.04 + Math.random() * 0.05;
-                this.currentTime = this.duration * porcentaje;
+                if (esLargo(this.duration)) {
+                    const a = 10 * 60;
+                    const b = 15 * 60;
+                    this.currentTime = Math.min(a + Math.random() * (b - a), this.duration * 0.2);
+                } else {
+                    this.currentTime = this.duration * (0.04 + Math.random() * 0.05);
+                }
             }
             delete this.dataset.randomStart;
         } else if (this.dataset.targetOffset) {
@@ -522,13 +592,20 @@ document.querySelectorAll(".video-layer").forEach(layer => {
     });
 
     layer.addEventListener("ended", function () {
+        if (!this.classList.contains("activa")) return;
         fallosSeguidos = 0;
+        reintentosMismo = 0;
+        ultimoTiempoBueno = 0;
         if (this._durTimer) { clearTimeout(this._durTimer); this._durTimer = null; }
         avanzarProgramacion();
     });
 
     layer.addEventListener("timeupdate", function () {
         if (!this.classList.contains("activa")) return;
+        if (this.currentTime > 2) {
+            ultimoTiempoBueno = this.currentTime;
+            fallosSeguidos = 0;
+        }
         if (!itemActual || itemActual.bloque === "bumper") return;
         if (this.dataset.anuncioHecho === "true") return;
         if (!this.duration || !isFinite(this.duration)) return;
@@ -541,6 +618,23 @@ document.querySelectorAll(".video-layer").forEach(layer => {
 
     layer.addEventListener("error", function () {
         if (!tvEncendida) return;
+        if (!this.classList.contains("activa")) return;
+
+        if (itemActual && itemActual.url_video && ultimoTiempoBueno > 20 && reintentosMismo < MAX_REINTENTOS_MISMO) {
+            reintentosMismo++;
+            const t = Math.max(0, ultimoTiempoBueno - 3);
+            const url = itemActual.url_video;
+            setTimeout(() => {
+                this.src = url;
+                this.dataset.randomStart = "false";
+                this.dataset.targetOffset = String(t);
+                this.play().catch(() => {});
+            }, 1500);
+            return;
+        }
+
+        reintentosMismo = 0;
+        ultimoTiempoBueno = 0;
         fallosSeguidos++;
         if (fallosSeguidos > MAX_FALLOS_SEGUIDOS) {
             fallosSeguidos = 0;
