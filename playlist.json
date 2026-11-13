@@ -1214,5 +1214,21 @@
     "peso": 9,
     "tipo": "odysee",
     "url_video": "https://odysee.com/$/download/NO-DEJEN-SU-SALUD-EN-MANOS-DE-LOS-M%C3%89DICOS-%E2%9A%A0%EF%B8%8F/6"
+  },
+  {
+    "id": "documental-isntituto-tavistok",
+    "titulo": "Documental Isntituto Tavistok",
+    "bloque": "historia",
+    "peso": 9,
+    "tipo": "odysee",
+    "url_video": "https://odysee.com/$/download/DOCUMENTAL-ISNTITUTO-TAVISTOK/d"
+  },
+  {
+    "id": "111k-views-77k-reactions-y-hasta-ahora-nadie-ha-podido-demostrar-su-existencia-alejandro-delgado-viena",
+    "titulo": "Y Hasta Ahora Nadie Ha Podido Demostrar Su Existencia",
+    "bloque": "ciencia",
+    "peso": 9,
+    "tipo": "odysee",
+    "url_video": "https://odysee.com/$/download/111K-views-%C2%B7-7.7K-reactions--Y-hasta-ahora-nadie-ha-podido-demostrar-su-existencia-%F0%9F%A4%B7%F0%9F%8F%BB_%E2%99%82%EF%B8%8F--Alejandro-Delgado-Viena/2"
   }
 ]
